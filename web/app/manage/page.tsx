@@ -36,24 +36,15 @@ import {
 } from "@/lib/validators";
 import {
   FULLSCREEN_CENTERED_BG,
-  PAGE_CONTAINER,
-  SECTION_PANEL,
-  SECTION_TITLE,
-  SUBSECTION_TITLE,
-  LABEL_TEXT,
   INPUT_BASE,
   INPUT_DATE,
   INPUT_TIME,
   BUTTON_PRIMARY,
-  BUTTON_OUTLINE,
-  ALERT_ERROR_WITH_MARGIN,
   SPINNER,
   HELPER_TEXT,
   GRID_2COL,
-  GRID_2COL_LAYOUT,
   SPACE_Y_3,
   LIST_ITEM,
-  CHECKBOX_LABEL,
 } from "@/lib/tailwind-classes";
 
 function ManagePageContent() {
@@ -767,7 +758,7 @@ function ManagePageContent() {
                   value={sceneName}
                   onChange={(e) => setSceneName(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                  placeholder="例: 屋上の対話"
+                  placeholder="例: シーン１"
                 />
               </div>
               <div>

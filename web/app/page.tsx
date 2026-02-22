@@ -92,7 +92,7 @@ export default function Home() {
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="例: 秋の物語"
+                placeholder="例: 映画『未完成』制作委員会"
                 required
                 disabled={isLoading}
                 className={INPUT_FULL_WIDTH}
