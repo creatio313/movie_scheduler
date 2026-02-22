@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Cast,
@@ -28,8 +28,35 @@ import {
   updateScene,
   updateTimeSlotDef,
 } from "@/lib/api";
+import {
+  validateCandidateDate,
+  validateSceneName,
+  validateTimeSlotName,
+  validateTimeRange,
+} from "@/lib/validators";
+import {
+  FULLSCREEN_CENTERED_BG,
+  PAGE_CONTAINER,
+  SECTION_PANEL,
+  SECTION_TITLE,
+  SUBSECTION_TITLE,
+  LABEL_TEXT,
+  INPUT_BASE,
+  INPUT_DATE,
+  INPUT_TIME,
+  BUTTON_PRIMARY,
+  BUTTON_OUTLINE,
+  ALERT_ERROR_WITH_MARGIN,
+  SPINNER,
+  HELPER_TEXT,
+  GRID_2COL,
+  GRID_2COL_LAYOUT,
+  SPACE_Y_3,
+  LIST_ITEM,
+  CHECKBOX_LABEL,
+} from "@/lib/tailwind-classes";
 
-export default function ManagePage() {
+function ManagePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = useMemo(() => searchParams.get("projectId") || "", [searchParams]);
@@ -112,6 +139,13 @@ export default function ManagePage() {
       return;
     }
 
+    // バリデーション
+    const dateValidation = validateCandidateDate(newDate);
+    if (!dateValidation.isValid) {
+      setError(dateValidation.error || "候補日の形式が無効です");
+      return;
+    }
+
     try {
       setIsSavingDate(true);
       setError("");
@@ -135,6 +169,13 @@ export default function ManagePage() {
 
   const handleSaveDate = async () => {
     if (!projectId || editingDateId === null) {
+      return;
+    }
+
+    // バリデーション
+    const dateValidation = validateCandidateDate(editingDateValue);
+    if (!dateValidation.isValid) {
+      setError(dateValidation.error || "候補日の形式が無効です");
       return;
     }
 
@@ -182,6 +223,21 @@ export default function ManagePage() {
       return;
     }
 
+    // バリデーション
+    const slotNameValidation = validateTimeSlotName(newSlotName.trim());
+    if (!slotNameValidation.isValid) {
+      setError(slotNameValidation.error || "時間枠名が無効です");
+      return;
+    }
+
+    if (newStartTime && newEndTime) {
+      const rangeValidation = validateTimeRange(newStartTime, newEndTime);
+      if (!rangeValidation.isValid) {
+        setError(rangeValidation.error || "時間範囲が無効です");
+        return;
+      }
+    }
+
     try {
       setIsSavingSlot(true);
       setError("");
@@ -212,6 +268,21 @@ export default function ManagePage() {
   const handleSaveSlot = async () => {
     if (!projectId || editingSlotId === null || !editingSlotName.trim()) {
       return;
+    }
+
+    // バリデーション
+    const slotNameValidation = validateTimeSlotName(editingSlotName.trim());
+    if (!slotNameValidation.isValid) {
+      setError(slotNameValidation.error || "時間枠名が無効です");
+      return;
+    }
+
+    if (editingSlotStart && editingSlotEnd) {
+      const rangeValidation = validateTimeRange(editingSlotStart, editingSlotEnd);
+      if (!rangeValidation.isValid) {
+        setError(rangeValidation.error || "時間範囲が無効です");
+        return;
+      }
     }
 
     try {
@@ -319,6 +390,13 @@ export default function ManagePage() {
       return;
     }
 
+    // バリデーション
+    const sceneNameValidation = validateSceneName(sceneName.trim());
+    if (!sceneNameValidation.isValid) {
+      setError(sceneNameValidation.error || "シーン名が無効です");
+      return;
+    }
+
     try {
       setIsSavingScene(true);
       setError("");
@@ -398,10 +476,10 @@ export default function ManagePage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-gray-50 dark:from-black dark:to-gray-900">
+      <div className={FULLSCREEN_CENTERED_BG}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border border-blue-300 border-t-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">読み込み中...</p>
+          <div className={`${SPINNER} mx-auto mb-4`}></div>
+          <p className={HELPER_TEXT}>読み込み中...</p>
         </div>
       </div>
     );
@@ -438,32 +516,32 @@ export default function ManagePage() {
                 type="date"
                 value={newDate}
                 onChange={(e) => setNewDate(e.target.value)}
-                className="flex-1 min-w-[180px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className={INPUT_DATE}
               />
               <button
                 onClick={handleAddDate}
                 disabled={!newDate || isSavingDate}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                className={BUTTON_PRIMARY}
               >
                 追加
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className={SPACE_Y_3}>
               {candidateDates.length === 0 && (
                 <p className="text-gray-500 dark:text-gray-400">候補日がまだ登録されていません</p>
               )}
               {candidateDates.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700"
+                  className={LIST_ITEM}
                 >
                   {editingDateId === item.id ? (
                     <input
                       type="date"
                       value={editingDateValue}
                       onChange={(e) => setEditingDateValue(e.target.value)}
-                      className="flex-1 min-w-[180px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      className={INPUT_DATE}
                     />
                   ) : (
                     <span className="text-gray-900 dark:text-gray-100 font-semibold">{item.target_date}</span>
@@ -532,16 +610,16 @@ export default function ManagePage() {
                 value={newSlotName}
                 onChange={(e) => setNewSlotName(e.target.value)}
                 placeholder="時間枠名"
-                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className={INPUT_BASE}
               />
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className={GRID_2COL}>
                 <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
                   開始時間
                   <input
                     type="time"
                     value={newStartTime}
                     onChange={(e) => setNewStartTime(e.target.value)}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className={INPUT_TIME}
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm text-gray-600 dark:text-gray-300">
@@ -550,27 +628,27 @@ export default function ManagePage() {
                     type="time"
                     value={newEndTime}
                     onChange={(e) => setNewEndTime(e.target.value)}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className={INPUT_TIME}
                   />
                 </label>
               </div>
               <button
                 onClick={handleAddSlot}
                 disabled={!newSlotName.trim() || isSavingSlot}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+                className={BUTTON_PRIMARY}
               >
                 追加
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className={SPACE_Y_3}>
               {timeSlots.length === 0 && (
                 <p className="text-gray-500 dark:text-gray-400">時間枠がまだ登録されていません</p>
               )}
               {timeSlots.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700"
+                  className={LIST_ITEM}
                 >
                   {editingSlotId === item.id ? (
                     <div className="flex flex-1 flex-col gap-2">
@@ -825,5 +903,13 @@ export default function ManagePage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function ManagePage() {
+  return (
+    <Suspense fallback={<div>読み込み中...</div>}>
+      <ManagePageContent />
+    </Suspense>
   );
 }

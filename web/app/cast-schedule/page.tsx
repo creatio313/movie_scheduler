@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CandidateDate,
@@ -18,8 +18,25 @@ import {
   updateCast,
   updateCastAvailability,
 } from "@/lib/api";
+import { validateCastName, validateCastRole } from "@/lib/validators";
+import {
+  FULLSCREEN_CENTERED_BG,
+  PAGE_CONTAINER,
+  SECTION_PANEL,
+  SECTION_TITLE,
+  INPUT_BASE,
+  INPUT_FULL_WIDTH,
+  BUTTON_PRIMARY,
+  BUTTON_OUTLINE,
+  ALERT_ERROR_WITH_MARGIN,
+  SPINNER,
+  HELPER_TEXT,
+  SPACE_Y_3,
+  LIST_ITEM_SELECTABLE,
+  LIST_ITEM,
+} from "@/lib/tailwind-classes";
 
-export default function CastSchedulePage() {
+function CastSchedulePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = useMemo(() => searchParams.get("projectId") || "", [searchParams]);
@@ -107,6 +124,21 @@ export default function CastSchedulePage() {
       return;
     }
 
+    // バリデーション
+    const nameValidation = validateCastName(newCastName.trim());
+    if (!nameValidation.isValid) {
+      setError(nameValidation.error || "キャスト名が無効です");
+      return;
+    }
+
+    if (newCastRole.trim()) {
+      const roleValidation = validateCastRole(newCastRole.trim());
+      if (!roleValidation.isValid) {
+        setError(roleValidation.error || "役名が無効です");
+        return;
+      }
+    }
+
     try {
       setIsSaving(true);
       setError("");
@@ -137,6 +169,21 @@ export default function CastSchedulePage() {
   const handleSaveCast = async () => {
     if (!projectId || editingCastId === null || !editingCastName.trim()) {
       return;
+    }
+
+    // バリデーション
+    const nameValidation = validateCastName(editingCastName.trim());
+    if (!nameValidation.isValid) {
+      setError(nameValidation.error || "キャスト名が無効です");
+      return;
+    }
+
+    if (editingCastRole.trim()) {
+      const roleValidation = validateCastRole(editingCastRole.trim());
+      if (!roleValidation.isValid) {
+        setError(roleValidation.error || "役名が無効です");
+        return;
+      }
     }
 
     try {
@@ -265,14 +312,14 @@ export default function CastSchedulePage() {
                 value={newCastName}
                 onChange={(e) => setNewCastName(e.target.value)}
                 placeholder="氏名"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className={INPUT_FULL_WIDTH}
               />
               <input
                 type="text"
                 value={newCastRole}
                 onChange={(e) => setNewCastRole(e.target.value)}
                 placeholder="役名"
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className={INPUT_FULL_WIDTH}
               />
               <button
                 onClick={handleAddCast}
@@ -283,34 +330,38 @@ export default function CastSchedulePage() {
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className={SPACE_Y_3}>
               {casts.length === 0 && (
                 <p className="text-gray-500 dark:text-gray-400">キャストがまだ登録されていません</p>
               )}
               {casts.map((cast) => (
                 <div
                   key={cast.id}
-                  className={`rounded-xl border px-4 py-3 transition ${
+                  onClick={() => cast.id && setSelectedCastId(cast.id)}
+                  className={`rounded-xl border px-4 py-3 transition cursor-pointer ${
                     selectedCastId === cast.id
                       ? "border-blue-500 bg-blue-50/60 dark:border-blue-400 dark:bg-blue-900/20"
                       : "border-gray-200 dark:border-gray-700"
                   }`}
                 >
                   {editingCastId === cast.id ? (
-                    <div className="space-y-2">
+                    <div className={SPACE_Y_3}>
                       <input
                         value={editingCastName}
                         onChange={(e) => setEditingCastName(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        className={INPUT_FULL_WIDTH}
                       />
                       <input
                         value={editingCastRole}
                         onChange={(e) => setEditingCastRole(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                        className={INPUT_FULL_WIDTH}
                       />
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={handleSaveCast}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveCast();
+                          }}
                           disabled={isSaving}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-green-600 hover:bg-green-50 disabled:opacity-50 dark:border-gray-600 dark:text-green-400 dark:hover:bg-green-900/20"
                           aria-label="保存"
@@ -320,7 +371,10 @@ export default function CastSchedulePage() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => setEditingCastId(null)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCastId(null);
+                          }}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                           aria-label="キャンセル"
                         >
@@ -332,16 +386,16 @@ export default function CastSchedulePage() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <button
-                        onClick={() => cast.id && setSelectedCastId(cast.id)}
-                        className="w-full text-left"
-                      >
+                      <div>
                         <div className="text-gray-900 dark:text-gray-100 font-semibold">{cast.name}</div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">{cast.role_name || "役名なし"}</div>
-                      </button>
+                      </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => handleEditCast(cast)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCast(cast);
+                          }}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                           aria-label="編集"
                         >
@@ -351,7 +405,10 @@ export default function CastSchedulePage() {
                           </svg>
                         </button>
                         <button
-                          onClick={() => handleDeleteCast(cast.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCast(cast.id);
+                          }}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/20"
                           aria-label="削除"
                         >
@@ -439,5 +496,13 @@ export default function CastSchedulePage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CastSchedulePage() {
+  return (
+    <Suspense fallback={<div className={FULLSCREEN_CENTERED_BG}><div className="text-center"><div className={`${SPINNER} mx-auto mb-4`}></div><p className={HELPER_TEXT}>読み込み中...</p></div></div>}>
+      <CastSchedulePageContent />
+    </Suspense>
   );
 }

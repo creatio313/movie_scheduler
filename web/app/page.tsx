@@ -3,6 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createProject } from "@/lib/api";
+import { validateProjectTitle } from "@/lib/validators";
+import {
+  FULLSCREEN_CENTERED_BG,
+  PAGE_CONTAINER,
+  PAGE_TITLE,
+  PAGE_SUBTITLE,
+  SECTION_TITLE,
+  LABEL_TEXT,
+  INPUT_FULL_WIDTH,
+  TEXTAREA_BASE,
+  BUTTON_PRIMARY_FULL,
+  ALERT_ERROR,
+  CARD_CONTAINER,
+} from "@/lib/tailwind-classes";
 
 export default function Home() {
   const router = useRouter();
@@ -15,6 +29,14 @@ export default function Home() {
     e.preventDefault();
     setError("");
     setIsLoading(true);
+
+    // バリデーション
+    const titleValidation = validateProjectTitle(title);
+    if (!titleValidation.isValid) {
+      setError(titleValidation.error || "プロジェクト名が無効です");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const project = await createProject({
@@ -34,35 +56,35 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-gray-50 dark:from-black dark:to-gray-900">
-      <main className="w-full max-w-2xl px-6 py-12">
+    <div className={FULLSCREEN_CENTERED_BG}>
+      <main className={PAGE_CONTAINER}>
         {/* ヘッダー */}
         <div className="mb-12 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white mb-4">
+          <h1 className={`${PAGE_TITLE} mb-4`}>
             撮影計画支援電算処理システム
           </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400">
+          <p className={PAGE_SUBTITLE}>
             候補日時と役者のスケジュールから、シーン別の撮影可能日時を算出します。
           </p>
         </div>
 
         {/* フォームカード */}
-        <div className="rounded-lg shadow-lg bg-white dark:bg-gray-800 p-8">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">
+        <div className={CARD_CONTAINER}>
+          <h2 className={`${SECTION_TITLE} mb-6`}>
             新しいプロジェクトを作成
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* エラーメッセージ */}
             {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+              <div className={ALERT_ERROR}>
+                <p className={`text-red-700 dark:text-red-300 text-sm`}>{error}</p>
               </div>
             )}
 
             {/* プロジェクト名入力 */}
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="title" className={`${LABEL_TEXT} mb-2`}>
                 プロジェクト名 <span className="text-red-500">*</span>
               </label>
               <input
@@ -73,13 +95,13 @@ export default function Home() {
                 placeholder="例: 秋の物語"
                 required
                 disabled={isLoading}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                className={INPUT_FULL_WIDTH}
               />
             </div>
 
             {/* 説明入力 */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="description" className={`${LABEL_TEXT} mb-2`}>
                 説明
               </label>
               <textarea
@@ -89,7 +111,7 @@ export default function Home() {
                 placeholder="このプロジェクトの説明を入力してください（オプション）"
                 disabled={isLoading}
                 rows={4}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+                className={TEXTAREA_BASE}
               />
             </div>
 
@@ -97,7 +119,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={isLoading || !title.trim()}
-              className="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={BUTTON_PRIMARY_FULL}
             >
               {isLoading ? "作成中..." : "プロジェクトを作成する"}
             </button>

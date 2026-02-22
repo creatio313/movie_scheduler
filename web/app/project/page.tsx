@@ -1,10 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { deleteProject, getProject, listCasts, listSceneAvailabilities, listSceneRequiredCasts, Project, SceneAvailabilityRow, updateProject } from "@/lib/api";
+import { validateProjectTitle } from "@/lib/validators";
+import {
+  FULLSCREEN_CENTERED_BG,
+  PAGE_CONTAINER,
+  NARROW_CONTAINER,
+  CARD_CONTAINER,
+  SECTION_TITLE,
+  LABEL_TEXT,
+  INPUT_FULL_WIDTH,
+  INPUT_LARGE_TITLE,
+  BUTTON_ICON,
+  BUTTON_SECONDARY_BLUE,
+  BUTTON_SECONDARY_GREEN,
+  ALERT_ERROR_WITH_MARGIN,
+  LINK_BACK,
+  SPINNER,
+  HELPER_TEXT,
+} from "@/lib/tailwind-classes";
 
-export default function ProjectPage() {
+function ProjectPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const projectId = useMemo(() => searchParams.get("id") || "", [searchParams]);
@@ -125,6 +143,13 @@ export default function ProjectPage() {
       return;
     }
 
+    // バリデーション
+    const titleValidation = validateProjectTitle(draftTitle);
+    if (!titleValidation.isValid) {
+      setError(titleValidation.error || "プロジェクト名が無効です");
+      return;
+    }
+
     try {
       setError("");
       setIsSaving(true);
@@ -177,10 +202,10 @@ export default function ProjectPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-gray-50 dark:from-black dark:to-gray-900">
+      <div className={FULLSCREEN_CENTERED_BG}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border border-blue-300 border-t-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">読み込み中...</p>
+          <div className={`${SPINNER} mx-auto mb-4`}></div>
+          <p className={HELPER_TEXT}>読み込み中...</p>
         </div>
       </div>
     );
@@ -188,10 +213,10 @@ export default function ProjectPage() {
 
   if (!project) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-white to-gray-50 dark:from-black dark:to-gray-900">
-        <div className="w-full max-w-2xl px-6">
-          <div className="rounded-lg shadow-lg bg-white dark:bg-gray-800 p-8">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+      <div className={FULLSCREEN_CENTERED_BG}>
+        <div className={NARROW_CONTAINER}>
+          <div className={CARD_CONTAINER}>
+            <h1 className={`${SECTION_TITLE} mb-4`}>
               エラーが発生しました
             </h1>
             <p className="text-red-600 dark:text-red-400 mb-6">
@@ -199,7 +224,7 @@ export default function ProjectPage() {
             </p>
             <button
               onClick={() => router.push("/")}
-              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
+              className={BUTTON_SECONDARY_BLUE}
             >
               ホームに戻る
             </button>
@@ -211,16 +236,16 @@ export default function ProjectPage() {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-black dark:to-gray-900">
-      <main className="w-full max-w-4xl mx-auto px-6 py-12">
+      <main className={PAGE_CONTAINER}>
         {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+          <div className={ALERT_ERROR_WITH_MARGIN}>
             {error}
           </div>
         )}
         <div className="mb-8">
           <button
             onClick={() => router.push("/")}
-            className="mb-4 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-2"
+            className={LINK_BACK}
           >
             <span>←</span> ホームに戻る
           </button>
@@ -231,7 +256,7 @@ export default function ProjectPage() {
                   value={draftTitle}
                   onChange={(e) => setDraftTitle(e.target.value)}
                   disabled={isSaving}
-                  className="w-full max-w-lg rounded-lg border border-gray-300 bg-white px-4 py-2 text-2xl font-bold text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  className={INPUT_LARGE_TITLE}
                 />
                 <div className="flex items-center gap-2">
                   <button
@@ -313,7 +338,7 @@ export default function ProjectPage() {
                     onChange={(e) => setDraftDescription(e.target.value)}
                     disabled={isSaving}
                     rows={5}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    className={INPUT_FULL_WIDTH}
                     placeholder="このプロジェクトの説明を入力してください（オプション）"
                   />
                   <div className="flex items-center gap-2">
@@ -352,13 +377,13 @@ export default function ProjectPage() {
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   onClick={() => router.push(`/cast-schedule?projectId=${projectId}`)}
-                  className="px-4 py-2 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50 font-semibold transition-colors dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20"
+                  className={BUTTON_SECONDARY_BLUE}
                 >
                   予定入力
                 </button>
                 <button
                   onClick={() => router.push(`/manage?projectId=${projectId}`)}
-                  className="px-4 py-2 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 font-semibold transition-colors dark:border-green-700 dark:text-green-300 dark:hover:bg-green-900/20"
+                  className={BUTTON_SECONDARY_GREEN}
                 >
                   管理
                 </button>
@@ -435,5 +460,13 @@ export default function ProjectPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ProjectPage() {
+  return (
+    <Suspense fallback={<div className={FULLSCREEN_CENTERED_BG}><div className="text-center"><div className={`${SPINNER} mx-auto mb-4`}></div><p className={HELPER_TEXT}>読み込み中...</p></div></div>}>
+      <ProjectPageContent />
+    </Suspense>
   );
 }
