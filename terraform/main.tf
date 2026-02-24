@@ -243,3 +243,14 @@ resource "sakura_server" "database_management_server" {
       user_ip_address  = "192.168.100.11"
   }]
 }
+
+# Outputs for the application
+output "database_secret_vault_id" {
+  description = "The Vault ID of the database secret for Secret Manager"
+  value       = sakura_secret_manager.database_secret.id
+}
+
+output "database_secret_name" {
+  description = "The name of the database secret"
+  value       = sakura_secret_manager_secret.database_secret_value.name
+}
