@@ -1,5 +1,46 @@
-data "sakura_archive" "ubuntu" {
-  os_type = "ubuntu2404"
+resource "sakura_apprun_shared" "movie_scheduler_api" {
+  name = "API service for Movie Scheduler"
+
+  components = [{
+    name       = "movie_scheduler_api"
+    max_cpu    = "0.5"
+    max_memory = "1Gi"
+    deploy_source = {
+      container_registry = {
+        image               = var.container_image
+        username            = var.container_username
+        password_wo         = var.container_password
+        password_wo_version = 1
+      }
+    }
+    env = [{
+      key   = "SAKURA_ACCESS_TOKEN"
+      value = var.secret_access_token
+      },
+      {
+        key   = "SAKURA_ACCESS_TOKEN_SECRET"
+        value = var.secret_access_token_secret
+      },
+      {
+        key   = "SAKURA_SECRET_NAME"
+        value = sakura_secret_manager_secret.database_secret_value.name
+      },
+      {
+        key   = "SAKURA_VAULT_ID"
+        value = sakura_secret_manager.database_secret.id
+    }]
+    probe = {
+      http_get = {
+        path = "/health"
+        port = 8080
+      }
+    }
+  }]
+
+  min_scale       = 0
+  max_scale       = 2
+  port            = 8080
+  timeout_seconds = 60
 }
 
 resource "sakura_kms" "database_key" {
@@ -19,7 +60,7 @@ resource "sakura_secret_manager_secret" "database_secret_value" {
   vault_id = sakura_secret_manager.database_secret.id
   value_wo = jsonencode({
     database_name = var.database_username
-    host          = var.database_ip
+    host          = sakura_vpn_router.standard_vpn_router.public_ip
     port          = 3306
     username      = var.database_username
     password      = var.database_password
@@ -29,11 +70,12 @@ resource "sakura_secret_manager_secret" "database_secret_value" {
 
 resource "sakura_vswitch" "switch_for_database" {
   name        = "データベース接続用スイッチ"
-  description = "AppRun専有型のワーカーノードとデータベースを接続するためのスイッチ。"
+  description = "VPNルータとデータベースを接続するためのスイッチ。"
 
   icon_id = var.database_icon
   zone    = var.zone
 }
+
 resource "sakura_database" "movie_scheduler_database" {
   name        = "movie_scheduler_database"
   description = "Movie scheduler database for AppRun."
@@ -48,7 +90,7 @@ resource "sakura_database" "movie_scheduler_database" {
     ip_address    = var.database_ip
     netmask       = 24
     gateway       = var.database_gateway
-    port          = 3306
+    port          = var.database_port
     source_ranges = var.database_source_ranges
   }
 
@@ -58,11 +100,14 @@ resource "sakura_database" "movie_scheduler_database" {
 
   database_type    = "mariadb"
   database_version = "10.11"
+
   disk = {
     encryption_algorithm = "aes256_xts"
     kms_key_id           = sakura_kms.database_key.id
   }
+
   icon_id = var.database_icon
+
   monitoring_suite = {
     enabled = true
   }
@@ -89,159 +134,77 @@ resource "sakura_database" "movie_scheduler_database" {
   plan = "10g"
   zone = var.zone
 }
-resource "sakura_disk" "database_management_server_disk" {
-  name        = "database_management_server_disk"
-  description = "Disk for the database management server."
 
-  connector            = "virtio"
-  encryption_algorithm = "aes256_xts"
-  icon_id              = var.ubuntu_icon
-  kms_key_id           = sakura_kms.database_key.id
-  plan                 = "ssd"
-  size                 = 20
-  source_archive_id    = data.sakura_archive.ubuntu.id
-  zone                 = var.zone
-}
+resource "sakura_vpn_router" "standard_vpn_router" {
+  name        = "standard_vpn_router"
+  description = "VPN router for connecting to the database securely."
 
-resource "sakura_packet_filter" "minimum_filter" {
-  name        = "minimum_filter"
-  description = "Minimum packet filter for the database management server(SSH)."
-  zone        = var.zone
-}
-
-resource "sakura_packet_filter_rules" "minimum_rules" {
-  packet_filter_id = sakura_packet_filter.minimum_filter.id
-  zone             = var.zone
-
-  expression = [
-    {
-      description      = "Allow SSH access. Limit source IP addresses, if needed."
-      destination_port = "22"
-      protocol         = "tcp"
-      source_network   = "0.0.0.0/0"
-    },
-    {
-      protocol       = "udp"
-      source_port    = "123"
-      source_network = "0.0.0.0/0"
-    },
-    {
-      protocol         = "udp"
-      destination_port = "68"
-    },
-    {
-      protocol = "icmp"
-    },
-    {
-      protocol         = "tcp"
-      destination_port = "32768-61000"
-    },
-    {
-      protocol         = "udp"
-      destination_port = "32768-61000"
-    },
-    {
-      protocol = "fragment"
-    },
-    {
-      protocol    = "ip"
-      allow       = false
-      description = "Deny all except above rules."
-    }
-  ]
-}
-
-resource "sakura_packet_filter" "database_filter" {
-  name        = "database_filter"
-  description = "Packet filter for the database management server(toDB)."
-  zone        = var.zone
-}
-
-resource "sakura_packet_filter_rules" "database_rules" {
-  packet_filter_id = sakura_packet_filter.database_filter.id
-  zone             = var.zone
-
-  expression = [
-    {
-      protocol         = "tcp"
-      destination_port = "32768-61000"
-      source_network   = var.database_source_ranges[0]
-    },
-    {
-      description    = "Allow ICMP from DB for troubleshooting."
-      protocol       = "icmp"
-      source_network = var.database_source_ranges[0]
-    },
-    {
-      description = "Allow IPv4 fragments (rare but harmless for return traffic)."
-      protocol    = "fragment"
-    },
-    {
-      description = "Deny all except above rules."
-      protocol    = "ip"
-      allow       = false
-    }
-  ]
-}
-
-resource "sakura_script" "mariadb_install_script" {
-  name    = "mariadb_install_script"
-  class   = "shell"
-  content = file("scripts/install_mariadb_client.sh")
-  icon_id = var.ubuntu_icon
-}
-
-# Generate a temporary SSH key pair for the server.
-resource "tls_private_key" "temporary_ssh_key" {
-  algorithm = "RSA"
-  rsa_bits  = 4096
-}
-
-# Save the private key to a local file. Please save it securely, as it will be needed to access the server.
-resource "local_sensitive_file" "private_key_file" {
-  content  = tls_private_key.temporary_ssh_key.private_key_pem
-  filename = ".ssh/id_rsa.pem"
-}
-
-resource "sakura_ssh_key" "database_management_server_ssh_key" {
-  name        = "database_management_server_sshkey"
-  description = "SSH key for the database management server."
-  public_key  = tls_private_key.temporary_ssh_key.public_key_openssh
-}
-
-resource "sakura_server" "database_management_server" {
-  name        = "database_management_server"
-  description = "Server for the database management."
-
-  core             = 1
-  disks            = [sakura_disk.database_management_server_disk.id]
-  icon_id          = var.ubuntu_icon
-  interface_driver = "virtio"
-  memory           = 1
-  tags             = ["@keyboard-us"]
-  zone             = var.zone
-
-  disk_edit_parameter = {
-    hostname            = "ubuntuhost"
-    password_wo         = var.os_password
-    password_wo_version = 1
-    disable_pw_auth     = true
-
-    ssh_key_ids = [sakura_ssh_key.database_management_server_ssh_key.id]
-    script = [{
-      id = sakura_script.mariadb_install_script.id
+  firewall = [{
+    interface_index = 0
+    direction       = "receive"
+    expression = [{
+      protocol = "tcp"
+      # AppRunの送信元IPに応じて適宜変更。
+      source_network   = "*"
+      destination_port = "3306"
+      allow            = true
+      logging          = true
+      description      = "Allow AppRun to access the database"
+      },
+      {
+        protocol         = "tcp"
+        source_network   = var.database_operator_global_ip
+        destination_port = "443"
+        allow            = true
+        logging          = true
+        description      = "Allow HTTPS access for database operator"
+      },
+      {
+        protocol    = "ip"
+        allow       = false
+        logging     = true
+        description = "Deny all other traffic"
     }]
+  }]
+
+  icon_id             = var.vpn_icon
+  internet_connection = true
+
+  monitoring_suite = {
+    enabled = true
   }
 
-  network_interface = [{
-    upstream         = "shared"
-    packet_filter_id = sakura_packet_filter.minimum_filter.id
+  plan = "standard"
+
+  port_forwarding = [{
+    protocol     = "tcp"
+    public_port  = 3306
+    private_ip   = var.database_ip
+    private_port = var.database_port
+    description  = "Allow AppRun to access the database."
     },
     {
-      upstream         = sakura_vswitch.switch_for_database.id
-      packet_filter_id = sakura_packet_filter.database_filter.id
-      user_ip_address  = "192.168.100.11"
+      protocol     = "tcp"
+      public_port  = 443
+      private_ip   = var.database_ip
+      private_port = 443
+      description  = "Allow HTTPS access for database operator."
   }]
+
+  private_network_interface = [{
+    index        = 1
+    vswitch_id   = sakura_vswitch.switch_for_database.id
+    ip_addresses = [var.vpn_internal_ip]
+    netmask      = 24
+  }]
+
+  scheduled_maintenance = {
+    day_of_week = "mon"
+    hour        = 4
+  }
+
+  version = 2
+  zone    = var.zone
 }
 
 # Outputs for the application

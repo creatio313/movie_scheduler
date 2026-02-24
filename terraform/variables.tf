@@ -8,6 +8,22 @@ variable "access_token_secret" {
   description = "Access token secret of the project"
   sensitive   = true
 }
+//正式リリース後に変更する
+variable "container_image" {
+  type        = string
+  description = "Container image to deploy."
+  sensitive   = true
+}
+variable "container_username" {
+  type        = string
+  description = "Username"
+  sensitive   = true
+}
+variable "container_password" {
+  type        = string
+  description = "Password"
+  sensitive   = true
+}
 variable "database_gateway" {
   type        = string
   description = "Gateway for the database subnet."
@@ -22,6 +38,16 @@ variable "database_ip" {
   type        = string
   description = "IP address of the database."
   default     = "192.168.100.10"
+}
+variable "database_operator_global_ip" {
+  type        = string
+  description = "Global IP address of the database operator."
+  sensitive   = true
+}
+variable "database_port" {
+  type        = number
+  description = "Port number for the database."
+  sensitive   = true
 }
 variable "database_username" {
   type        = string
@@ -38,15 +64,25 @@ variable "database_source_ranges" {
   description = "Allowed source CIDR ranges for database access."
   default     = ["192.168.100.0/24"]
 }
-variable "os_password" {
+variable "secret_access_token" {
   type        = string
-  description = "OS password of the server."
+  description = "Access token to fetch the secret."
   sensitive   = true
 }
-variable "ubuntu_icon" {
+variable "secret_access_token_secret" {
   type        = string
-  description = "ID of the ubuntu icon."
-  default     = "112901627751"
+  description = "Access token secret to fetch the secret."
+  sensitive   = true
+}
+variable "vpn_icon" {
+  type        = string
+  description = "ID of the VPN icon."
+  default     = "112300511393"
+}
+variable "vpn_internal_ip" {
+  type        = string
+  description = "Internal IP for the VPN."
+  default     = "192.168.100.11"
 }
 variable "zone" {
   type        = string
