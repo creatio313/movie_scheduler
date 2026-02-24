@@ -52,3 +52,6 @@ terraform/.terraform.tfstate.lock.info
 
 # Terraform directory
 terraform/.terraform/
+
+# Terraform SSH keys
+terraform/.ssh/

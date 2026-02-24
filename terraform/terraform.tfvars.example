@@ -1,5 +1,4 @@
 access_token           = "YOUR_ACCESS_TOKEN_HERE"
 access_token_secret    = "YOUR_ACCESS_TOKEN_SECRET_HERE"
 database_password      = "YOUR_DATABASE_PASSWORD_HERE"
-database_gateway       = "192.168.100.1"
-database_source_ranges = ["192.168.100.0/24"]
+os_password            = "YOUR_OS_PASSWORD_HERE"
