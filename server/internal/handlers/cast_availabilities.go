@@ -75,7 +75,13 @@ func HandleUpdateCastAvailability(db *sql.DB) http.HandlerFunc {
 
 		// 監査ログ
 		slog.Info("Cast availability updated", "availability_id", id, "is_available", c.IsAvailable)
-		c.ID, _ = strconv.Atoi(id)
+		availID, err := strconv.Atoi(id)
+		if err != nil {
+			slog.Error("Invalid availability ID format", "error", err, "availability_id", id)
+			http.Error(w, "Invalid availability ID format", http.StatusInternalServerError)
+			return
+		}
+		c.ID = availID
 		response.RespondJSON(w, http.StatusOK, c)
 	}
 }

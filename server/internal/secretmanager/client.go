@@ -1,15 +1,15 @@
 package secretmanager
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
-	"flag"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
-
-	sm "github.com/sacloud/secretmanager-api-go"
-	v1 "github.com/sacloud/secretmanager-api-go/apis/v1"
-	"github.com/sacloud/saclient-go"
+	"time"
 )
 
 // DatabaseSecret represents the database secret stored in Secret Manager
@@ -25,58 +25,110 @@ type DatabaseSecret struct {
 type SecretClient struct {
 	vaultID    string
 	secretName string
-	client     *v1.Client
+	token      string
 }
 
 // NewSecretClient creates a new Secret Manager client
 func NewSecretClient(vaultID, secretName string) (*SecretClient, error) {
 	if vaultID == "" {
-		return nil, fmt.Errorf("vault ID is required")
+		return nil, fmt.Errorf("SAKURA_VAULT_ID is required")
 	}
 
 	if secretName == "" {
 		secretName = "database_secret_value"
 	}
 
-	// Initialize saclient for authentication
-	var saClient saclient.Client
-	fs := saClient.FlagSet(flag.ContinueOnError)
-	// Ignore flag parse errors if command line arguments are not provided
-	_ = fs.Parse(os.Args[1:])
-	saClient.SetEnviron(os.Environ())
-	saClient.SetWith(saclient.WithFavouringBearerAuthentication())
-
-	// Create Secret Manager API client
-	client, err := sm.NewClient(&saClient)
+	// Create Bearer token from access token and secret
+	token, err := createBearerToken()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Secret Manager client: %w", err)
+		return nil, fmt.Errorf("failed to create Bearer token: %w", err)
 	}
 
 	return &SecretClient{
 		vaultID:    vaultID,
 		secretName: secretName,
-		client:     client,
+		token:      token,
 	}, nil
 }
 
-// FetchDatabaseSecret fetches the database secret from Secret Manager
+// createBearerToken creates a Bearer token from SAKURA_ACCESS_TOKEN and SAKURA_ACCESS_TOKEN_SECRET
+func createBearerToken() (string, error) {
+	accessToken := os.Getenv("SAKURA_ACCESS_TOKEN")
+	accessTokenSecret := os.Getenv("SAKURA_ACCESS_TOKEN_SECRET")
+
+	if accessToken == "" || accessTokenSecret == "" {
+		return "", fmt.Errorf("SAKURA_ACCESS_TOKEN and SAKURA_ACCESS_TOKEN_SECRET are required")
+	}
+
+	// Create Basic auth header: token:secret in base64
+	credentials := accessToken + ":" + accessTokenSecret
+	encoded := base64.StdEncoding.EncodeToString([]byte(credentials))
+	return "Basic " + encoded, nil
+}
+
+// FetchDatabaseSecret fetches the database secret from Secret Manager via API
 func (sc *SecretClient) FetchDatabaseSecret() (*DatabaseSecret, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Create secret operator for the vault
-	secretOp := sm.NewSecretOp(sc.client, sc.vaultID)
+	// API endpoint: https://secure.sakura.ad.jp/cloud/zone/is1c/api/cloud/1.1/secretmanager/vaults/{vaultID}/secrets/unveil
+	apiURL := fmt.Sprintf("https://secure.sakura.ad.jp/cloud/zone/is1c/api/cloud/1.1/secretmanager/vaults/%s/secrets/unveil", sc.vaultID)
 
-	// Unveil (fetch and decrypt) the secret
-	unveilRes, err := secretOp.Unveil(ctx, v1.Unveil{
-		Name: sc.secretName,
-	})
+	// Prepare request body
+	body := map[string]interface{}{
+		"Secret": map[string]interface{}{
+			"Name":    sc.secretName,
+		},
+	}
+	bodyBytes, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch secret: %w", err)
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Authorization", sc.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Execute HTTP request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request to Secret Manager API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	// Parse response
+	var apiResp struct {
+		Secret struct {
+			Name    string `json:"Name"`
+			Version int    `json:"Version"`
+			Value   string `json:"Value"`
+		} `json:"Secret"`
+	}
+	if err := json.Unmarshal(respBody, &apiResp); err != nil {
+		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
 
 	// Parse the secret value as JSON
 	var dbSecret DatabaseSecret
-	if err := json.Unmarshal([]byte(unveilRes.Value), &dbSecret); err != nil {
+	if err := json.Unmarshal([]byte(apiResp.Secret.Value), &dbSecret); err != nil {
 		return nil, fmt.Errorf("failed to parse secret value: invalid format")
 	}
 

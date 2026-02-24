@@ -88,7 +88,13 @@ func HandleUpdateCast(db *sql.DB) http.HandlerFunc {
 
 		// 監査ログ
 		slog.Info("Cast updated", "cast_id", id, "name", c.Name, "role_name", c.RoleName)
-		c.ID, _ = strconv.Atoi(id)
+		castID, err := strconv.Atoi(id)
+		if err != nil {
+			slog.Error("Invalid cast ID format", "error", err, "cast_id", id)
+			http.Error(w, "Invalid cast ID format", http.StatusInternalServerError)
+			return
+		}
+		c.ID = castID
 		response.RespondJSON(w, http.StatusOK, c)
 	}
 }

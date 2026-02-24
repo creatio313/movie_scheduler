@@ -90,7 +90,13 @@ func HandleUpdateScene(db *sql.DB) http.HandlerFunc {
 
 		// 監査ログ
 		slog.Info("Scene updated", "scene_id", id, "scene_name", s.SceneName)
-		s.ID, _ = strconv.Atoi(id)
+		sceneID, err := strconv.Atoi(id)
+		if err != nil {
+			slog.Error("Invalid scene ID format", "error", err, "scene_id", id)
+			http.Error(w, "Invalid scene ID format", http.StatusInternalServerError)
+			return
+		}
+		s.ID = sceneID
 		response.RespondJSON(w, http.StatusOK, s)
 	}
 }

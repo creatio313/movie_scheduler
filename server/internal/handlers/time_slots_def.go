@@ -109,7 +109,13 @@ func HandleUpdateTimeSlotDef(db *sql.DB) http.HandlerFunc {
 
 		// 監査ログ
 		slog.Info("Time slot updated", "time_slot_id", id, "slot_name", t.SlotName)
-		t.ID, _ = strconv.Atoi(id)
+		timeSlotID, err := strconv.Atoi(id)
+		if err != nil {
+			slog.Error("Invalid time_slot ID format", "error", err, "time_slot_id", id)
+			http.Error(w, "Invalid time_slot ID format", http.StatusInternalServerError)
+			return
+		}
+		t.ID = timeSlotID
 		response.RespondJSON(w, http.StatusOK, t)
 	}
 }

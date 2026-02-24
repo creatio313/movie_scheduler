@@ -88,7 +88,13 @@ func HandleUpdateCandidateDate(db *sql.DB) http.HandlerFunc {
 
 		// 監査ログ
 		slog.Info("Candidate date updated", "candidate_date_id", id, "target_date", cd.TargetDate)
-		cd.ID, _ = strconv.Atoi(id)
+		cdID, err := strconv.Atoi(id)
+		if err != nil {
+			slog.Error("Invalid candidate_date ID format", "error", err, "candidate_date_id", id)
+			http.Error(w, "Invalid candidate_date ID format", http.StatusInternalServerError)
+			return
+		}
+		cd.ID = cdID
 		response.RespondJSON(w, http.StatusOK, cd)
 	}
 }
