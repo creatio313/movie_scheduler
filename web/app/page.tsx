@@ -46,7 +46,7 @@ export default function Home() {
 
       // プロジェクト作成成功後、プロジェクトページに遷移
       if (project.id) {
-        router.push(`/project.html?id=${project.id}`);
+        router.push(`/project?id=${project.id}`);
       }
     } catch (err) {
       setError((err as Error).message || "プロジェクト作成に失敗しました");

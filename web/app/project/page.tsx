@@ -39,6 +39,7 @@ function ProjectPageContent() {
   const [sceneAvailabilities, setSceneAvailabilities] = useState<SceneAvailabilityRow[]>([]);
   const [isLoadingScenes, setIsLoadingScenes] = useState(true);
   const [sceneRequiredRoles, setSceneRequiredRoles] = useState<Record<number, string[]>>({});
+  const [copyFeedback, setCopyFeedback] = useState("");
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -200,6 +201,21 @@ function ProjectPageContent() {
     }
   };
 
+  const handleCopyLink = async () => {
+    if (!projectId) {
+      return;
+    }
+    try {
+      const url = `${window.location.origin}/project?id=${projectId}`;
+      await navigator.clipboard.writeText(url);
+      setCopyFeedback("リンクをコピーしました");
+      setTimeout(() => setCopyFeedback(""), 2000);
+    } catch (err) {
+      setCopyFeedback("コピーに失敗しました");
+      setTimeout(() => setCopyFeedback(""), 2000);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className={FULLSCREEN_CENTERED_BG}>
@@ -304,12 +320,30 @@ function ProjectPageContent() {
         <div className="rounded-lg shadow-lg bg-white dark:bg-gray-800 p-8">
           <div className="grid gap-8">
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300 mb-2">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300 mb-3">
                 プロジェクトID
               </h3>
-              <p className="text-lg font-mono text-gray-900 dark:text-gray-100 break-all">
-                {project.id}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-lg font-mono text-gray-900 dark:text-gray-100 break-all flex-1">
+                  {project.id}
+                </p>
+                <button
+                  onClick={handleCopyLink}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  aria-label="リンクをコピー"
+                  title="プロジェクトリンクをコピー"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                  </svg>
+                </button>
+                {copyFeedback && (
+                  <div className="text-sm text-green-600 dark:text-green-400 ml-2">
+                    {copyFeedback}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -376,13 +410,13 @@ function ProjectPageContent() {
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
-                  onClick={() => router.push(`/cast-schedule.html?projectId=${projectId}`)}
+                  onClick={() => router.push(`/cast-schedule?projectId=${projectId}`)}
                   className={BUTTON_SECONDARY_BLUE}
                 >
                   予定入力
                 </button>
                 <button
-                  onClick={() => router.push(`/manage.html?projectId=${projectId}`)}
+                  onClick={() => router.push(`/manage?projectId=${projectId}`)}
                   className={BUTTON_SECONDARY_GREEN}
                 >
                   管理

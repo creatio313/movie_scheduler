@@ -122,12 +122,10 @@ function CastSchedulePageContent() {
       return;
     }
 
-    if (newCastRole.trim()) {
-      const roleValidation = validateCastRole(newCastRole.trim());
-      if (!roleValidation.isValid) {
-        setError(roleValidation.error || "役名が無効です");
-        return;
-      }
+    const roleValidation = validateCastRole(newCastRole.trim());
+    if (!roleValidation.isValid) {
+      setError(roleValidation.error || "役名が無効です");
+      return;
     }
 
     try {
@@ -169,12 +167,10 @@ function CastSchedulePageContent() {
       return;
     }
 
-    if (editingCastRole.trim()) {
-      const roleValidation = validateCastRole(editingCastRole.trim());
-      if (!roleValidation.isValid) {
-        setError(roleValidation.error || "役名が無効です");
-        return;
-      }
+    const roleValidation = validateCastRole(editingCastRole.trim());
+    if (!roleValidation.isValid) {
+      setError(roleValidation.error || "役名が無効です");
+      return;
     }
 
     try {
@@ -280,7 +276,7 @@ function CastSchedulePageContent() {
         <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <button
-              onClick={() => router.push(`/project.html?id=${projectId}`)}
+              onClick={() => router.push(`/project?id=${projectId}`)}
               className="mb-3 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-2"
             >
               <span>←</span> プロジェクトに戻る
@@ -302,19 +298,19 @@ function CastSchedulePageContent() {
                 type="text"
                 value={newCastName}
                 onChange={(e) => setNewCastName(e.target.value)}
-                placeholder="氏名"
+                placeholder="氏名 *"
                 className={INPUT_FULL_WIDTH}
               />
               <input
                 type="text"
                 value={newCastRole}
                 onChange={(e) => setNewCastRole(e.target.value)}
-                placeholder="役名"
+                placeholder="役名 *"
                 className={INPUT_FULL_WIDTH}
               />
               <button
                 onClick={handleAddCast}
-                disabled={!newCastName.trim() || isSaving}
+                disabled={!newCastName.trim() || !newCastRole.trim() || isSaving}
                 className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
               >
                 キャストを追加
