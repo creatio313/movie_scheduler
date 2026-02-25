@@ -276,7 +276,7 @@ function CastSchedulePageContent() {
         <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <button
-              onClick={() => router.push(`/project?id=${projectId}`)}
+              onClick={() => router.push(`/project.html?id=${projectId}`)}
               className="mb-3 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-2"
             >
               <span>←</span> プロジェクトに戻る
