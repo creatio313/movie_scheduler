@@ -1,3 +1,20 @@
+resource "sakura_container_registry" "movie_scheduler_registry" {
+  name            = "撮影計画支援電算システム"
+  subdomain_label = "movie-scheduler-reg"
+  access_level    = "none"
+
+  description = "撮影計画支援電算処理システムのDockerイメージを格納するためのコンテナレジストリ。"
+  icon_id     = var.server_icon
+
+  user = [
+    {
+      name       = var.container_username
+      password   = var.container_password
+      permission = "all"
+    }
+  ]
+}
+
 resource "sakura_apprun_shared" "movie_scheduler_api" {
   name = "movie-scheduler-api"
 
@@ -8,10 +25,10 @@ resource "sakura_apprun_shared" "movie_scheduler_api" {
     deploy_source = {
       container_registry = {
         image               = var.container_image
-        username            = var.container_username
-        password_wo         = var.container_password
+        username            = tolist(sakura_container_registry.movie_scheduler_registry.user)[0].name
+        password_wo         = tolist(sakura_container_registry.movie_scheduler_registry.user)[0].password
         password_wo_version = 1
-        server              = var.container_image_server
+        server              = sakura_container_registry.movie_scheduler_registry.fqdn
       }
     }
     env = [{
@@ -31,7 +48,7 @@ resource "sakura_apprun_shared" "movie_scheduler_api" {
         value = sakura_secret_manager.database_secret.id
       },
       {
-        key = "ALLOWED_ORIGIN"
+        key   = "ALLOWED_ORIGIN"
         value = var.allowed_origin
       }
     ]
@@ -92,11 +109,11 @@ resource "sakura_database" "movie_scheduler_database" {
   }
 
   network_interface = {
-    vswitch_id    = sakura_vswitch.switch_for_database.id
-    ip_address    = var.database_ip
-    netmask       = 24
-    gateway       = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
-    port          = var.database_port
+    vswitch_id = sakura_vswitch.switch_for_database.id
+    ip_address = var.database_ip
+    netmask    = 24
+    gateway    = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
+    port       = var.database_port
     # AppRunの送信元IPに応じて適宜変更。
     # source_ranges = var.database_source_ranges
   }

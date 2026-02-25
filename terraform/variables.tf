@@ -18,9 +18,9 @@ variable "container_image" {
   description = "Container image to deploy."
   sensitive   = true
 }
-variable "container_image_server" {
+variable "container_registry_base_url" {
   type        = string
-  description = "Container registry server."
+  description = "Base URL of the container registry."
   sensitive   = true
 }
 variable "container_username" {
@@ -82,6 +82,11 @@ variable "secret_access_token_secret" {
   type        = string
   description = "Access token secret to fetch the secret."
   sensitive   = true
+}
+variable "server_icon" {
+  type        = string
+  description = "ID of the server icon."
+  default     = "112901627749"
 }
 variable "vpn_icon" {
   type        = string
