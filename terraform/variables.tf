@@ -8,10 +8,19 @@ variable "access_token_secret" {
   description = "Access token secret of the project"
   sensitive   = true
 }
-//正式リリース後に変更する
+variable "allowed_origin" {
+  type        = string
+  description = "Allowed origin for CORS."
+  default     = "https://w32hlqto.user.webaccel.jp"
+}
 variable "container_image" {
   type        = string
   description = "Container image to deploy."
+  sensitive   = true
+}
+variable "container_image_server" {
+  type        = string
+  description = "Container registry server."
   sensitive   = true
 }
 variable "container_username" {

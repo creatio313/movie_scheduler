@@ -1,9 +1,9 @@
 resource "sakura_apprun_shared" "movie_scheduler_api" {
-  name = "API service for Movie Scheduler"
+  name = "movie-scheduler-api"
 
   components = [{
-    name       = "movie_scheduler_api"
-    max_cpu    = "0.5"
+    name       = "movie-scheduler-api"
+    max_cpu    = 0.5
     max_memory = "1Gi"
     deploy_source = {
       container_registry = {
@@ -11,6 +11,7 @@ resource "sakura_apprun_shared" "movie_scheduler_api" {
         username            = var.container_username
         password_wo         = var.container_password
         password_wo_version = 1
+        server              = var.container_image_server
       }
     }
     env = [{
@@ -28,7 +29,12 @@ resource "sakura_apprun_shared" "movie_scheduler_api" {
       {
         key   = "SAKURA_VAULT_ID"
         value = sakura_secret_manager.database_secret.id
-    }]
+      },
+      {
+        key = "ALLOWED_ORIGIN"
+        value = var.allowed_origin
+      }
+    ]
     probe = {
       http_get = {
         path = "/health"
@@ -37,7 +43,7 @@ resource "sakura_apprun_shared" "movie_scheduler_api" {
     }
   }]
 
-  min_scale       = 0
+  min_scale       = 1
   max_scale       = 2
   port            = 8080
   timeout_seconds = 60
@@ -61,7 +67,7 @@ resource "sakura_secret_manager_secret" "database_secret_value" {
   value_wo = jsonencode({
     database_name = var.database_username
     host          = sakura_vpn_router.standard_vpn_router.public_ip
-    port          = 3306
+    port          = var.database_port
     username      = var.database_username
     password      = var.database_password
   })
@@ -89,9 +95,10 @@ resource "sakura_database" "movie_scheduler_database" {
     vswitch_id    = sakura_vswitch.switch_for_database.id
     ip_address    = var.database_ip
     netmask       = 24
-    gateway       = var.database_gateway
+    gateway       = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
     port          = var.database_port
-    source_ranges = var.database_source_ranges
+    # AppRunの送信元IPに応じて適宜変更。
+    # source_ranges = var.database_source_ranges
   }
 
   username            = var.database_username
@@ -145,8 +152,8 @@ resource "sakura_vpn_router" "standard_vpn_router" {
     expression = [{
       protocol = "tcp"
       # AppRunの送信元IPに応じて適宜変更。
-      source_network   = "*"
-      destination_port = "3306"
+      source_network   = "0.0.0.0/0"
+      destination_port = var.database_port
       allow            = true
       logging          = true
       description      = "Allow AppRun to access the database"
@@ -178,7 +185,7 @@ resource "sakura_vpn_router" "standard_vpn_router" {
 
   port_forwarding = [{
     protocol     = "tcp"
-    public_port  = 3306
+    public_port  = var.database_port
     private_ip   = var.database_ip
     private_port = var.database_port
     description  = "Allow AppRun to access the database."

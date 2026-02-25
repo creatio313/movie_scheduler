@@ -33,6 +33,7 @@ import {
   validateSceneName,
   validateTimeSlotName,
   validateTimeRange,
+  normalizeTime,
 } from "@/lib/validators";
 import {
   FULLSCREEN_CENTERED_BG,
@@ -235,8 +236,8 @@ function ManagePageContent() {
       const created = await createTimeSlotDef({
         project_id: projectId,
         slot_name: newSlotName.trim(),
-        start_time: newStartTime || undefined,
-        end_time: newEndTime || undefined,
+        start_time: normalizeTime(newStartTime) || undefined,
+        end_time: normalizeTime(newEndTime) || undefined,
       });
       setTimeSlots((prev) => [...prev, created]);
       setNewSlotName("");
@@ -282,8 +283,8 @@ function ManagePageContent() {
       const updated = await updateTimeSlotDef(editingSlotId, {
         project_id: projectId,
         slot_name: editingSlotName.trim(),
-        start_time: editingSlotStart || undefined,
-        end_time: editingSlotEnd || undefined,
+        start_time: normalizeTime(editingSlotStart) || undefined,
+        end_time: normalizeTime(editingSlotEnd) || undefined,
       });
       setTimeSlots((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
       setEditingSlotId(null);
@@ -487,7 +488,7 @@ function ManagePageContent() {
         <div className="mb-10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <button
-              onClick={() => router.push(`/project?id=${projectId}`)}
+              onClick={() => router.push(`/project.html?id=${projectId}`)}
               className="mb-3 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center gap-2"
             >
               <span>←</span> プロジェクトに戻る

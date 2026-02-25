@@ -107,23 +107,52 @@ export function validateTimeSlotName(name: string): ValidationResult {
 /**
  * 時刻を検証します
  * - オプショナル（空でもOK）
- * - HH:MM:SS形式
+ * - HH:MM または HH:MM:SS形式
+ * - HH:MM形式の場合は秒を00として扱う
  */
 export function validateTime(time: string): ValidationResult {
   if (!time || time.trim() === "") {
     return { isValid: true }; // 空でもOK
   }
-  // HH:MM:SS形式チェック
-  const timeRegex = /^\d{2}:\d{2}:\d{2}$/;
-  if (!timeRegex.test(time)) {
-    return { isValid: false, error: "時刻はHH:MM:SS形式で入力してください" };
+  
+  // HH:MM または HH:MM:SS形式チェック
+  const timeWithSecondsRegex = /^\d{2}:\d{2}:\d{2}$/;
+  const timeWithoutSecondsRegex = /^\d{2}:\d{2}$/;
+  
+  let hours: number, minutes: number, seconds: number = 0;
+  
+  if (timeWithSecondsRegex.test(time)) {
+    // HH:MM:SS形式
+    [hours, minutes, seconds] = time.split(":").map(Number);
+  } else if (timeWithoutSecondsRegex.test(time)) {
+    // HH:MM形式（秒は00とする）
+    [hours, minutes] = time.split(":").map(Number);
+    seconds = 0;
+  } else {
+    return { isValid: false, error: "時刻はHH:MM形式で入力してください" };
   }
+  
   // 有効な時刻かチェック
-  const [hours, minutes, seconds] = time.split(":").map(Number);
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
     return { isValid: false, error: "有効な時刻を入力してください" };
   }
   return { isValid: true };
+}
+
+/**
+ * 時刻をHH:MM:SS形式に正規化します
+ * - HH:MM形式の場合は:00を追加
+ * - 既にHH:MM:SS形式の場合はそのまま
+ */
+export function normalizeTime(time: string): string {
+  if (!time || time.trim() === "") {
+    return "";
+  }
+  // HH:MM形式の場合は:00を追加
+  if (/^\d{2}:\d{2}$/.test(time)) {
+    return time + ":00";
+  }
+  return time;
 }
 
 /**
