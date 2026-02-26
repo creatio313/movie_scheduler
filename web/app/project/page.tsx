@@ -40,6 +40,32 @@ function ProjectPageContent() {
   const [isLoadingScenes, setIsLoadingScenes] = useState(true);
   const [sceneRequiredRoles, setSceneRequiredRoles] = useState<Record<number, string[]>>({});
   const [copyFeedback, setCopyFeedback] = useState("");
+  const [showCopyModal, setShowCopyModal] = useState(false);
+
+  // 初回訪問時にモーダルを表示
+  useEffect(() => {
+    const isNew = searchParams.get("isNew") === "true";
+    if (isNew && projectId) {
+      const timer = setTimeout(() => {
+        setShowCopyModal(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [projectId, searchParams]);
+
+  const handleCopyModalUrl = async () => {
+    try {
+      const url = `${window.location.origin}/project.html?id=${projectId}`;
+      await navigator.clipboard.writeText(url);
+      setCopyFeedback("リンクをコピーしました");
+      setTimeout(() => setCopyFeedback(""), 1500);
+      setShowCopyModal(false);
+    } catch (err) {
+      console.error("Failed to copy URL", err);
+      setCopyFeedback("コピーに失敗しました");
+      setTimeout(() => setCopyFeedback(""), 1500);
+    }
+  };
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -321,11 +347,11 @@ function ProjectPageContent() {
           <div className="grid gap-8">
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300 mb-3">
-                プロジェクトID
+                共有用URL
               </h3>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-lg font-mono text-gray-900 dark:text-gray-100 break-all flex-1">
-                  {project.id}
+                  {`${window.location.origin}/project.html?id=${project.id}`}
                 </p>
                 <button
                   onClick={handleCopyLink}
@@ -492,6 +518,37 @@ function ProjectPageContent() {
             </div>
           </div>
         </div>
+
+        {/* 初回訪問時のモーダル */}
+        {showCopyModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md mx-4 animate-in fade-in zoom-in-95 duration-300">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                プロジェクト作成完了！
+              </h2>
+              <p className="text-gray-700 dark:text-gray-300 mb-6">
+                プロジェクトを作成しました。下のボタンでURLをコピーして共有できます。
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 bg-gray-100 dark:bg-gray-700 p-3 rounded break-all">
+                {`${window.location.origin}/project.html?id=${projectId}`}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCopyModalUrl}
+                  className="flex-1 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-semibold transition-colors"
+                >
+                  コピー
+                </button>
+                <button
+                  onClick={() => setShowCopyModal(false)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold transition-colors"
+                >
+                  閉じる
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
