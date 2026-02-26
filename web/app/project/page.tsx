@@ -16,6 +16,7 @@ import {
   BUTTON_ICON,
   BUTTON_SECONDARY_BLUE,
   BUTTON_SECONDARY_GREEN,
+  BUTTON_OUTLINE,
   ALERT_ERROR_WITH_MARGIN,
   LINK_BACK,
   SPINNER,
@@ -439,13 +440,19 @@ function ProjectPageContent() {
                   onClick={() => router.push(`/manage.html?projectId=${projectId}`)}
                   className={BUTTON_SECONDARY_GREEN}
                 >
-                  候補日時入力・シーン設定
+                  1. 候補日時入力
                 </button>
                 <button
                   onClick={() => router.push(`/cast-schedule.html?projectId=${projectId}`)}
                   className={BUTTON_SECONDARY_BLUE}
                 >
-                  キャスト予定入力
+                  2. キャスト予定入力
+                </button>
+                <button
+                  onClick={() => router.push(`/scenes.html?projectId=${projectId}`)}
+                  className="px-4 py-2 rounded-lg border border-purple-300 text-purple-700 hover:bg-purple-50 font-semibold transition-colors dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-900/20"
+                >
+                  3. シーン設定
                 </button>
               </div>
             </div>
