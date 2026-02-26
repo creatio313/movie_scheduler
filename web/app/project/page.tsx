@@ -235,11 +235,11 @@ function ProjectPageContent() {
     try {
       const url = `${window.location.origin}/project.html?id=${projectId}`;
       await navigator.clipboard.writeText(url);
-      setCopyFeedback("リンクをコピーしました");
-      setTimeout(() => setCopyFeedback(""), 2000);
+      setCopyFeedback("success");
+      setTimeout(() => setCopyFeedback(""), 1500);
     } catch (err) {
-      setCopyFeedback("コピーに失敗しました");
-      setTimeout(() => setCopyFeedback(""), 2000);
+      setCopyFeedback("error");
+      setTimeout(() => setCopyFeedback(""), 1500);
     }
   };
 
@@ -356,7 +356,13 @@ function ProjectPageContent() {
                 </p>
                 <button
                   onClick={handleCopyLink}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border transition-colors ${
+                    copyFeedback === "success"
+                      ? "border-green-500 text-green-600 bg-green-50 dark:border-green-700 dark:text-green-400 dark:bg-green-900/20"
+                      : copyFeedback === "error"
+                      ? "border-red-500 text-red-600 bg-red-50 dark:border-red-700 dark:text-red-400 dark:bg-red-900/20"
+                      : "border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  }`}
                   aria-label="リンクをコピー"
                   title="プロジェクトリンクをコピー"
                 >
@@ -365,11 +371,6 @@ function ProjectPageContent() {
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                   </svg>
                 </button>
-                {copyFeedback && (
-                  <div className="text-sm text-green-600 dark:text-green-400 ml-2">
-                    {copyFeedback}
-                  </div>
-                )}
               </div>
             </div>
 
