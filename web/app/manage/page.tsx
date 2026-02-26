@@ -493,7 +493,7 @@ function ManagePageContent() {
             >
               <span>←</span> プロジェクトに戻る
             </button>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">管理: {projectName}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">候補日時入力・シーン設定: {projectName}</h1>
           </div>
           <div className="rounded-full bg-gray-900 text-white px-4 py-2 text-sm font-semibold dark:bg-gray-100 dark:text-gray-900">
             制作者用設定

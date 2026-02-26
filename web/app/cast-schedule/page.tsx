@@ -281,7 +281,7 @@ function CastSchedulePageContent() {
             >
               <span>←</span> プロジェクトに戻る
             </button>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">予定入力: {projectName}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">キャスト予定入力: {projectName}</h1>
             <p className="text-gray-600 dark:text-gray-400">候補日と時間枠に対して出演可能な日時を登録します</p>
           </div>
           <div className="rounded-full bg-blue-600 text-white px-4 py-2 text-sm font-semibold shadow-lg">

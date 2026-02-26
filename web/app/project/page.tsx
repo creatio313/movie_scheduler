@@ -436,16 +436,16 @@ function ProjectPageContent() {
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
-                  onClick={() => router.push(`/cast-schedule.html?projectId=${projectId}`)}
-                  className={BUTTON_SECONDARY_BLUE}
-                >
-                  予定入力
-                </button>
-                <button
                   onClick={() => router.push(`/manage.html?projectId=${projectId}`)}
                   className={BUTTON_SECONDARY_GREEN}
                 >
-                  管理
+                  候補日時入力・シーン設定
+                </button>
+                <button
+                  onClick={() => router.push(`/cast-schedule.html?projectId=${projectId}`)}
+                  className={BUTTON_SECONDARY_BLUE}
+                >
+                  キャスト予定入力
                 </button>
               </div>
             </div>
