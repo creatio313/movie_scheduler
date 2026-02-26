@@ -206,7 +206,7 @@ function ProjectPageContent() {
       return;
     }
     try {
-      const url = `${window.location.origin}/project?id=${projectId}`;
+      const url = `${window.location.origin}/project.html?id=${projectId}`;
       await navigator.clipboard.writeText(url);
       setCopyFeedback("リンクをコピーしました");
       setTimeout(() => setCopyFeedback(""), 2000);
