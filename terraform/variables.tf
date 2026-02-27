@@ -8,21 +8,6 @@ variable "access_token_secret" {
   description = "Access token secret of the project"
   sensitive   = true
 }
-variable "allowed_origin" {
-  type        = string
-  description = "Allowed origin for CORS."
-  default     = "https://w32hlqto.user.webaccel.jp"
-}
-variable "container_image" {
-  type        = string
-  description = "Container image to deploy."
-  sensitive   = true
-}
-variable "container_registry_base_url" {
-  type        = string
-  description = "Base URL of the container registry."
-  sensitive   = true
-}
 variable "container_username" {
   type        = string
   description = "Username"
@@ -33,11 +18,6 @@ variable "container_password" {
   description = "Password"
   sensitive   = true
 }
-variable "database_gateway" {
-  type        = string
-  description = "Gateway for the database subnet."
-  default     = "192.168.100.1"
-}
 variable "database_icon" {
   type        = string
   description = "ID of the database icon."
@@ -46,7 +26,7 @@ variable "database_icon" {
 variable "database_ip" {
   type        = string
   description = "IP address of the database."
-  default     = "192.168.100.10"
+  default     = "192.168.1.11"
 }
 variable "database_operator_global_ip" {
   type        = string
@@ -71,17 +51,7 @@ variable "database_password" {
 variable "database_source_ranges" {
   type        = list(string)
   description = "Allowed source CIDR ranges for database access."
-  default     = ["192.168.100.0/24"]
-}
-variable "secret_access_token" {
-  type        = string
-  description = "Access token to fetch the secret."
-  sensitive   = true
-}
-variable "secret_access_token_secret" {
-  type        = string
-  description = "Access token secret to fetch the secret."
-  sensitive   = true
+  default     = ["192.168.1.0/24"]
 }
 variable "server_icon" {
   type        = string
@@ -96,7 +66,7 @@ variable "vpn_icon" {
 variable "vpn_internal_ip" {
   type        = string
   description = "Internal IP for the VPN."
-  default     = "192.168.100.11"
+  default     = "192.168.1.1"
 }
 variable "zone" {
   type        = string

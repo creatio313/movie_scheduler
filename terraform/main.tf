@@ -1,10 +1,10 @@
 resource "sakura_container_registry" "movie_scheduler_registry" {
-  name            = "撮影計画支援電算システム"
-  subdomain_label = "movie-scheduler-reg"
-  access_level    = "none"
+  name        = "撮影計画支援電算システムAPI"
+  description = "撮影計画支援電算処理システムAPIのDockerイメージを格納するためのコンテナレジストリ。"
 
-  description = "撮影計画支援電算処理システムのDockerイメージを格納するためのコンテナレジストリ。"
-  icon_id     = var.server_icon
+  subdomain_label = "movie-scheduler-reg-beta"
+  access_level    = "none"
+  icon_id         = var.server_icon
 
   user = [
     {
@@ -15,66 +15,15 @@ resource "sakura_container_registry" "movie_scheduler_registry" {
   ]
 }
 
-resource "sakura_apprun_shared" "movie_scheduler_api" {
-  name = "movie-scheduler-api"
-
-  components = [{
-    name       = "movie-scheduler-api"
-    max_cpu    = 0.5
-    max_memory = "1Gi"
-    deploy_source = {
-      container_registry = {
-        image               = var.container_image
-        username            = tolist(sakura_container_registry.movie_scheduler_registry.user)[0].name
-        password_wo         = tolist(sakura_container_registry.movie_scheduler_registry.user)[0].password
-        password_wo_version = 1
-        server              = sakura_container_registry.movie_scheduler_registry.fqdn
-      }
-    }
-    env = [{
-      key   = "SAKURA_ACCESS_TOKEN"
-      value = var.secret_access_token
-      },
-      {
-        key   = "SAKURA_ACCESS_TOKEN_SECRET"
-        value = var.secret_access_token_secret
-      },
-      {
-        key   = "SAKURA_SECRET_NAME"
-        value = sakura_secret_manager_secret.database_secret_value.name
-      },
-      {
-        key   = "SAKURA_VAULT_ID"
-        value = sakura_secret_manager.database_secret.id
-      },
-      {
-        key   = "ALLOWED_ORIGIN"
-        value = var.allowed_origin
-      }
-    ]
-    probe = {
-      http_get = {
-        path = "/health"
-        port = 8080
-      }
-    }
-  }]
-
-  min_scale       = 1
-  max_scale       = 2
-  port            = 8080
-  timeout_seconds = 60
-}
-
 resource "sakura_kms" "database_key" {
-  name        = "database_key"
-  description = "KMS key for encrypting database disks."
+  name        = "データベース認証用シークレット暗号鍵"
+  description = "データベースのディスクおよびデータベース認証用シークレットを暗号化するためのKMS鍵。"
   key_origin  = "generated"
 }
 
 resource "sakura_secret_manager" "database_secret" {
-  name        = "database_secret"
-  description = "Secret for database credentials."
+  name        = "データベース認証用シークレット"
+  description = "データベース認証用シークレットを格納するためのシークレット保管庫。"
   kms_key_id  = sakura_kms.database_key.id
 }
 
@@ -83,12 +32,140 @@ resource "sakura_secret_manager_secret" "database_secret_value" {
   vault_id = sakura_secret_manager.database_secret.id
   value_wo = jsonencode({
     database_name = var.database_username
-    host          = sakura_vpn_router.standard_vpn_router.public_ip
+    host          = var.database_ip
     port          = var.database_port
     username      = var.database_username
     password      = var.database_password
   })
   value_wo_version = 1
+}
+
+resource "sakura_packet_filter" "apprun_lb_eth" {
+  name        = "Webサーバー用パケットフィルタ"
+  description = "Webサーバー用のパケットフィルタ。非HTTPアクセスをブロックするためのフィルタルールを定義。"
+
+  zone = var.zone
+}
+
+resource "sakura_packet_filter_rules" "apprun_lb_eth_rules" {
+  packet_filter_id = sakura_packet_filter.apprun_lb_eth.id
+  zone             = var.zone
+
+  expression = [
+    # 外部からのWebアクセス許可
+    {
+      protocol         = "tcp"
+      destination_port = "80"
+    },
+    {
+      protocol         = "tcp"
+      destination_port = "443"
+    },
+    # 自発的な外部通信（API呼び出し等）の戻りパケットを許可（エフェメラルポート）
+    {
+      protocol         = "tcp"
+      destination_port = "32768-65535"
+    },
+    {
+      protocol         = "udp"
+      destination_port = "32768-65535"
+    },
+    # ICMPとフラグメントは許可（必要な通信のため）
+    {
+      protocol = "icmp"
+    },
+    {
+      protocol = "fragment"
+    },
+    # 上記以外をすべて拒否 (さくらのクラウドはデフォルト許可のため必須)
+    {
+      protocol    = "ip"
+      allow       = false
+      description = "Deny ALL"
+    }
+  ]
+}
+
+resource "sakura_packet_filter" "lb_switch" {
+  name        = "Webサーバ内部NIC用パケットフィルタ"
+  description = "Webサーバー内部NIC用のパケットフィルタ。内部通信を制御するためのフィルタルールを定義。"
+
+  zone = var.zone
+}
+
+resource "sakura_packet_filter_rules" "lb_switch_rules" {
+  packet_filter_id = sakura_packet_filter.lb_switch.id
+  zone             = var.zone
+
+  expression = [
+    # APIサーバからのアクセス許可
+    {
+      protocol       = "ip"
+      source_network = "192.168.1.64/26"
+    },
+    # 自発的な外部通信（API呼び出し等）の戻りパケットを許可（エフェメラルポート）
+    {
+      protocol         = "tcp"
+      destination_port = "32768-65535"
+    },
+    {
+      protocol         = "udp"
+      destination_port = "32768-65535"
+    },
+    # ICMPとフラグメントは許可（必要な通信のため）
+    {
+      protocol = "icmp"
+    },
+    {
+      protocol = "fragment"
+    },
+    # 上記以外をすべて拒否 (さくらのクラウドはデフォルト許可のため必須)
+    {
+      protocol    = "ip"
+      allow       = false
+      description = "Deny ALL"
+    }
+  ]
+}
+
+resource "sakura_packet_filter" "worker_switch" {
+  name        = "APIサーバ用パケットフィルタ"
+  description = "APIサーバ用のパケットフィルタ。内部通信を制御するためのフィルタルールを定義。"
+}
+
+resource "sakura_packet_filter_rules" "worker_switch_rules" {
+  packet_filter_id = sakura_packet_filter.worker_switch.id
+  zone             = var.zone
+
+  expression = [
+    # ロードバランサからのアクセスを許可
+    {
+      protocol         = "tcp"
+      source_network   = "192.168.1.128/26"
+      destination_port = "8080"
+    },
+    {
+      protocol         = "tcp"
+      destination_port = "32768-65535"
+    },
+    {
+      protocol         = "udp"
+      destination_port = "32768-65535"
+    },
+    # ICMPとフラグメントは許可（必要な通信のため）
+    {
+      protocol = "icmp"
+    },
+    {
+      protocol = "fragment"
+    },
+    # 上記以外をすべて拒否 (さくらのクラウドはデフォルト許可のため必須)
+    {
+      protocol    = "ip"
+      allow       = false
+      description = "Deny ALL"
+    }
+  ]
 }
 
 resource "sakura_vswitch" "switch_for_database" {
@@ -100,8 +177,8 @@ resource "sakura_vswitch" "switch_for_database" {
 }
 
 resource "sakura_database" "movie_scheduler_database" {
-  name        = "movie_scheduler_database"
-  description = "Movie scheduler database for AppRun."
+  name        = "撮影計画支援電算システムデータベース"
+  description = "撮影計画支援電算システムデータベース。MariaDB 10.11を使用。"
 
   backup = {
     days_of_week = ["mon"]
@@ -109,13 +186,12 @@ resource "sakura_database" "movie_scheduler_database" {
   }
 
   network_interface = {
-    vswitch_id = sakura_vswitch.switch_for_database.id
-    ip_address = var.database_ip
-    netmask    = 24
-    gateway    = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
-    port       = var.database_port
-    # AppRunの送信元IPに応じて適宜変更。
-    # source_ranges = var.database_source_ranges
+    vswitch_id    = sakura_vswitch.switch_for_database.id
+    ip_address    = var.database_ip
+    netmask       = 24
+    gateway       = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
+    port          = var.database_port
+    source_ranges = concat(var.database_source_ranges, ["${var.database_operator_global_ip}"])
   }
 
   username            = var.database_username
@@ -160,34 +236,26 @@ resource "sakura_database" "movie_scheduler_database" {
 }
 
 resource "sakura_vpn_router" "standard_vpn_router" {
-  name        = "standard_vpn_router"
-  description = "VPN router for connecting to the database securely."
+  name        = "外部接続用VPNルータ"
+  description = "外部接続用VPNルータ。データベースへの安全な接続を提供。"
 
   firewall = [{
     interface_index = 0
     direction       = "receive"
-    expression = [{
-      protocol = "tcp"
-      # AppRunの送信元IPに応じて適宜変更。
-      source_network   = "0.0.0.0/0"
-      destination_port = var.database_port
-      allow            = true
-      logging          = true
-      description      = "Allow AppRun to access the database"
-      },
+    expression = [
       {
         protocol         = "tcp"
         source_network   = var.database_operator_global_ip
         destination_port = "443"
         allow            = true
         logging          = true
-        description      = "Allow HTTPS access for database operator"
+        description      = "データベースオペレーターのHTTPSアクセスを許可"
       },
       {
         protocol    = "ip"
         allow       = false
         logging     = true
-        description = "Deny all other traffic"
+        description = "他トラフィックを拒否"
     }]
   }]
 
@@ -200,19 +268,13 @@ resource "sakura_vpn_router" "standard_vpn_router" {
 
   plan = "standard"
 
-  port_forwarding = [{
-    protocol     = "tcp"
-    public_port  = var.database_port
-    private_ip   = var.database_ip
-    private_port = var.database_port
-    description  = "Allow AppRun to access the database."
-    },
+  port_forwarding = [
     {
       protocol     = "tcp"
-      public_port  = 443
+      public_port  = 7777
       private_ip   = var.database_ip
       private_port = 443
-      description  = "Allow HTTPS access for database operator."
+      description  = "データベースオペレーターのHTTPSアクセスを許可"
   }]
 
   private_network_interface = [{
