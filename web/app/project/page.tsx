@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { deleteProject, getProject, listCasts, listSceneAvailabilities, listSceneRequiredCasts, Project, SceneAvailabilityRow, updateProject } from "@/lib/api";
+import { deleteProject, getProject, listCasts, listScenes, listSceneAvailabilities, listSceneRequiredCasts, Project, Scene, SceneAvailabilityRow, updateProject } from "@/lib/api";
 import { validateProjectTitle } from "@/lib/validators";
 import {
   FULLSCREEN_CENTERED_BG,
@@ -37,6 +37,7 @@ function ProjectPageContent() {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
+  const [scenes, setScenes] = useState<Scene[]>([]);
   const [sceneAvailabilities, setSceneAvailabilities] = useState<SceneAvailabilityRow[]>([]);
   const [isLoadingScenes, setIsLoadingScenes] = useState(true);
   const [sceneRequiredRoles, setSceneRequiredRoles] = useState<Record<number, string[]>>({});
@@ -93,7 +94,7 @@ function ProjectPageContent() {
   }, [projectId]);
 
   useEffect(() => {
-    const fetchSceneAvailabilities = async () => {
+    const fetchSceneData = async () => {
       if (!projectId) {
         setIsLoadingScenes(false);
         return;
@@ -101,7 +102,11 @@ function ProjectPageContent() {
 
       try {
         setIsLoadingScenes(true);
-        const rows = await listSceneAvailabilities(projectId);
+        const [sceneRows, rows] = await Promise.all([
+          listScenes(projectId),
+          listSceneAvailabilities(projectId),
+        ]);
+        setScenes(sceneRows);
         setSceneAvailabilities(rows);
       } catch (err) {
         setError((err as Error).message || "シーンの撮影可能日時の読み込みに失敗しました");
@@ -110,7 +115,7 @@ function ProjectPageContent() {
       }
     };
 
-    fetchSceneAvailabilities();
+    fetchSceneData();
   }, [projectId]);
 
   useEffect(() => {
@@ -119,7 +124,7 @@ function ProjectPageContent() {
         return;
       }
 
-      const sceneIds = Array.from(new Set(sceneAvailabilities.map((row) => row.scene_id)));
+      const sceneIds = scenes.map((scene) => scene.id).filter((sceneId): sceneId is number => typeof sceneId === "number");
       if (sceneIds.length === 0) {
         setSceneRequiredRoles({});
         return;
@@ -145,7 +150,7 @@ function ProjectPageContent() {
     };
 
     fetchSceneRequiredRoles();
-  }, [projectId, sceneAvailabilities]);
+  }, [projectId, scenes]);
 
   const sceneAvailabilityGroups = useMemo(() => {
     const map = new Map<number, { sceneName: string; items: SceneAvailabilityRow[] }>();
@@ -154,12 +159,12 @@ function ProjectPageContent() {
       entry.items.push(row);
       map.set(row.scene_id, entry);
     });
-    return Array.from(map.entries()).map(([sceneId, entry]) => ({
-      sceneId,
-      sceneName: entry.sceneName,
-      items: entry.items,
+    return scenes.map((scene) => ({
+      sceneId: scene.id || 0,
+      sceneName: scene.scene_name,
+      items: scene.id ? map.get(scene.id)?.items || [] : [],
     }));
-  }, [sceneAvailabilities]);
+  }, [sceneAvailabilities, scenes]);
 
   const handleSave = async () => {
     if (!projectId || !project) {
@@ -463,8 +468,8 @@ function ProjectPageContent() {
               </h3>
               {isLoadingScenes ? (
                 <p className="text-gray-500 dark:text-gray-400">読み込み中...</p>
-              ) : sceneAvailabilityGroups.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400">撮影可能な日時がまだ登録されていません</p>
+              ) : scenes.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400">シーンがまだ登録されていません</p>
               ) : (
                 <div className="space-y-6">
                   {sceneAvailabilityGroups.map((group) => (
@@ -477,27 +482,31 @@ function ProjectPageContent() {
                           必要役者: {sceneRequiredRoles[group.sceneId]?.join(" / ") || "未設定"}
                         </div>
                       </div>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                          <thead>
-                            <tr className="text-left text-gray-600 dark:text-gray-300">
-                              <th className="py-2 pr-4">撮影候補日</th>
-                              <th className="py-2">時間枠</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {group.items.map((item, index) => (
-                              <tr key={`${item.scene_id}-${item.time_slot_id}-${item.target_date}-${index}`} className="border-t border-gray-200 dark:border-gray-700">
-                                <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{item.target_date}</td>
-                                <td className="py-2 text-gray-700 dark:text-gray-300">
-                                  {item.slot_name}
-                                  <span className="text-gray-500 dark:text-gray-400"> ({item.start_time || "--:--"}-{item.end_time || "--:--"})</span>
-                                </td>
+                      {group.items.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">候補日がありません</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-gray-600 dark:text-gray-300">
+                                <th className="py-2 pr-4">撮影候補日</th>
+                                <th className="py-2">時間枠</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody>
+                              {group.items.map((item, index) => (
+                                <tr key={`${item.scene_id}-${item.time_slot_id}-${item.target_date}-${index}`} className="border-t border-gray-200 dark:border-gray-700">
+                                  <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{item.target_date}</td>
+                                  <td className="py-2 text-gray-700 dark:text-gray-300">
+                                    {item.slot_name}
+                                    <span className="text-gray-500 dark:text-gray-400"> ({item.start_time || "--:--"}-{item.end_time || "--:--"})</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
