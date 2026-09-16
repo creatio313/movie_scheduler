@@ -15,6 +15,13 @@ export interface Cast {
   created_at?: string;
 }
 
+export interface Scene {
+  id?: number;
+  project_id: string;
+  scene_name: string;
+  description?: string;
+}
+
 export interface CandidateDate {
   id?: number;
   project_id: string;
@@ -29,19 +36,10 @@ export interface TimeSlotDef {
   end_time?: string;
 }
 
-export interface CastAvailability {
+export interface SceneAllowedTimeSlot {
   id?: number;
-  candidate_date_id: number;
+  scene_id: number;
   time_slot_id: number;
-  cast_id: number;
-  is_available: number;
-}
-
-export interface Scene {
-  id?: number;
-  project_id: string;
-  scene_name: string;
-  description?: string;
 }
 
 export interface SceneRequiredCast {
@@ -50,10 +48,12 @@ export interface SceneRequiredCast {
   cast_id: number;
 }
 
-export interface SceneAllowedTimeSlot {
+export interface CastAvailability {
   id?: number;
-  scene_id: number;
+  candidate_date_id: number;
   time_slot_id: number;
+  cast_id: number;
+  is_available: number;
 }
 
 export interface SceneAvailabilityRow {
@@ -66,10 +66,33 @@ export interface SceneAvailabilityRow {
   end_time?: string;
 }
 
+export interface ProjectHomeScene {
+  scene: Scene;
+  required_casts: Cast[];
+  availabilities: SceneAvailabilityRow[];
+}
+
+export interface ProjectHome {
+  project: Project;
+  scenes: ProjectHomeScene[];
+}
+
+type ProjectInput = Pick<Project, "title" | "description">;
+type CastInput = Pick<Cast, "name" | "role_name">;
+type SceneInput = Pick<Scene, "scene_name" | "description">;
+type CandidateDateInput = Pick<CandidateDate, "target_date">;
+type TimeSlotDefInput = Pick<TimeSlotDef, "slot_name" | "start_time" | "end_time">;
+type CastAvailabilityInput = Pick<CastAvailability, "candidate_date_id" | "time_slot_id" | "cast_id" | "is_available">;
+
+async function throwApiError(response: Response, message: string): Promise<never> {
+  const detail = (await response.text()).trim();
+  throw new Error(detail || message);
+}
+
 /**
  * プロジェクトを作成します
  */
-export async function createProject(data: Project): Promise<Project> {
+export async function createProject(data: ProjectInput): Promise<Project> {
   const response = await fetch(`${API_BASE_URL}/api/projects`, {
     method: "POST",
     headers: {
@@ -79,7 +102,7 @@ export async function createProject(data: Project): Promise<Project> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create project: ${response.statusText}`);
+    return throwApiError(response, "プロジェクト作成に失敗しました。");
   }
 
   return response.json();
@@ -92,7 +115,20 @@ export async function getProject(id: string): Promise<Project> {
   const response = await fetch(`${API_BASE_URL}/api/projects/${id}`);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch project: ${response.statusText}`);
+    return throwApiError(response, "プロジェクト取得に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * プロジェクトホーム画面に必要な情報を取得します
+ */
+export async function getProjectHome(id: string): Promise<ProjectHome> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${id}/home`);
+
+  if (!response.ok) {
+    return throwApiError(response, "プロジェクトホーム取得に失敗しました。");
   }
 
   return response.json();
@@ -101,7 +137,7 @@ export async function getProject(id: string): Promise<Project> {
 /**
  * プロジェクトを更新します
  */
-export async function updateProject(id: string, data: Project): Promise<Project> {
+export async function updateProject(id: string, data: ProjectInput): Promise<Project> {
   const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
     method: "PUT",
     headers: {
@@ -111,7 +147,7 @@ export async function updateProject(id: string, data: Project): Promise<Project>
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update project: ${response.statusText}`);
+    return throwApiError(response, "プロジェクト更新に失敗しました。");
   }
 
   return response.json();
@@ -126,7 +162,7 @@ export async function deleteProject(id: string): Promise<void> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete project: ${response.statusText}`);
+    return throwApiError(response, "プロジェクト削除に失敗しました。");
   }
 }
 
@@ -137,7 +173,7 @@ export async function listCasts(projectId: string): Promise<Cast[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts`);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch casts: ${response.statusText}`);
+    return throwApiError(response, "キャスト一覧取得に失敗しました。");
   }
 
   return response.json();
@@ -146,8 +182,8 @@ export async function listCasts(projectId: string): Promise<Cast[]> {
 /**
  * キャストを作成します
  */
-export async function createCast(data: Cast): Promise<Cast> {
-  const response = await fetch(`${API_BASE_URL}/api/casts`, {
+export async function createCast(projectId: string, data: CastInput): Promise<Cast> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -156,7 +192,7 @@ export async function createCast(data: Cast): Promise<Cast> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create cast: ${response.statusText}`);
+    return throwApiError(response, "キャスト作成に失敗しました。");
   }
 
   return response.json();
@@ -165,8 +201,8 @@ export async function createCast(data: Cast): Promise<Cast> {
 /**
  * キャストを更新します
  */
-export async function updateCast(id: number, data: Cast): Promise<Cast> {
-  const response = await fetch(`${API_BASE_URL}/api/casts/${id}`, {
+export async function updateCast(projectId: string, id: number, data: CastInput): Promise<Cast> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -175,7 +211,7 @@ export async function updateCast(id: number, data: Cast): Promise<Cast> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update cast: ${response.statusText}`);
+    return throwApiError(response, "キャスト更新に失敗しました。");
   }
 
   return response.json();
@@ -184,13 +220,13 @@ export async function updateCast(id: number, data: Cast): Promise<Cast> {
 /**
  * キャストを削除します
  */
-export async function deleteCast(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/casts/${id}`, {
+export async function deleteCast(projectId: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts/${id}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete cast: ${response.statusText}`);
+    return throwApiError(response, "キャスト削除に失敗しました。");
   }
 }
 
@@ -201,7 +237,7 @@ export async function listScenes(projectId: string): Promise<Scene[]> {
   const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes`);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch scenes: ${response.statusText}`);
+    return throwApiError(response, "シーン一覧の取得に失敗しました。");
   }
 
   return response.json();
@@ -210,8 +246,8 @@ export async function listScenes(projectId: string): Promise<Scene[]> {
 /**
  * シーンを作成します
  */
-export async function createScene(data: Scene): Promise<Scene> {
-  const response = await fetch(`${API_BASE_URL}/api/scenes`, {
+export async function createScene(projectId: string, data: SceneInput): Promise<Scene> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -220,7 +256,7 @@ export async function createScene(data: Scene): Promise<Scene> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create scene: ${response.statusText}`);
+    return throwApiError(response, "シーン作成に失敗しました。");
   }
 
   return response.json();
@@ -229,8 +265,8 @@ export async function createScene(data: Scene): Promise<Scene> {
 /**
  * シーンを更新します
  */
-export async function updateScene(id: number, data: Scene): Promise<Scene> {
-  const response = await fetch(`${API_BASE_URL}/api/scenes/${id}`, {
+export async function updateScene(projectId: string, id: number, data: SceneInput): Promise<Scene> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -239,7 +275,7 @@ export async function updateScene(id: number, data: Scene): Promise<Scene> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update scene: ${response.statusText}`);
+    return throwApiError(response, "シーン更新に失敗しました。");
   }
 
   return response.json();
@@ -248,116 +284,13 @@ export async function updateScene(id: number, data: Scene): Promise<Scene> {
 /**
  * シーンを削除します
  */
-export async function deleteScene(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/scenes/${id}`, {
+export async function deleteScene(projectId: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${id}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete scene: ${response.statusText}`);
-  }
-}
-
-/**
- * プロジェクト内のシーン撮影可能日時を取得します
- */
-export async function listSceneAvailabilities(projectId: string): Promise<SceneAvailabilityRow[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scene_availabilities`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch scene availabilities: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * シーンに必要な役者一覧を取得します
- */
-export async function listSceneRequiredCasts(sceneId: number): Promise<SceneRequiredCast[]> {
-  const response = await fetch(`${API_BASE_URL}/api/scenes/${sceneId}/scene_required_casts`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch scene required casts: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * シーンに必要な役者を追加します
- */
-export async function createSceneRequiredCast(data: SceneRequiredCast): Promise<SceneRequiredCast> {
-  const response = await fetch(`${API_BASE_URL}/api/scene_required_casts`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create scene required cast: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * シーンに必要な役者を削除します
- */
-export async function deleteSceneRequiredCast(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/scene_required_casts/${id}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete scene required cast: ${response.statusText}`);
-  }
-}
-
-/**
- * シーンで撮影可能な時間枠一覧を取得します
- */
-export async function listSceneAllowedTimeSlots(sceneId: number): Promise<SceneAllowedTimeSlot[]> {
-  const response = await fetch(`${API_BASE_URL}/api/scenes/${sceneId}/scene_allowed_time_slots`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch scene allowed time slots: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * シーンで撮影可能な時間枠を追加します
- */
-export async function createSceneAllowedTimeSlot(data: SceneAllowedTimeSlot): Promise<SceneAllowedTimeSlot> {
-  const response = await fetch(`${API_BASE_URL}/api/scene_allowed_time_slots`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create scene allowed time slot: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * シーンで撮影可能な時間枠を削除します
- */
-export async function deleteSceneAllowedTimeSlot(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/scene_allowed_time_slots/${id}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete scene allowed time slot: ${response.statusText}`);
+    return throwApiError(response, "シーン削除に失敗しました。");
   }
 }
 
@@ -365,10 +298,10 @@ export async function deleteSceneAllowedTimeSlot(id: number): Promise<void> {
  * プロジェクトの候補日一覧を取得します
  */
 export async function listCandidateDates(projectId: string): Promise<CandidateDate[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/candidate_dates`);
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/candidate-dates`);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch candidate dates: ${response.statusText}`);
+    return throwApiError(response, "候補日一覧の取得に失敗しました。");
   }
 
   return response.json();
@@ -377,8 +310,8 @@ export async function listCandidateDates(projectId: string): Promise<CandidateDa
 /**
  * 候補日を作成します
  */
-export async function createCandidateDate(data: CandidateDate): Promise<CandidateDate> {
-  const response = await fetch(`${API_BASE_URL}/api/candidate_dates`, {
+export async function createCandidateDate(projectId: string, data: CandidateDateInput): Promise<CandidateDate> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/candidate-dates`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -387,26 +320,7 @@ export async function createCandidateDate(data: CandidateDate): Promise<Candidat
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create candidate date: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * 候補日を更新します
- */
-export async function updateCandidateDate(id: number, data: CandidateDate): Promise<CandidateDate> {
-  const response = await fetch(`${API_BASE_URL}/api/candidate_dates/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update candidate date: ${response.statusText}`);
+    return throwApiError(response, "候補日作成に失敗しました。");
   }
 
   return response.json();
@@ -415,75 +329,24 @@ export async function updateCandidateDate(id: number, data: CandidateDate): Prom
 /**
  * 候補日を削除します
  */
-export async function deleteCandidateDate(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/candidate_dates/${id}`, {
+export async function deleteCandidateDate(projectId: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/candidate-dates/${id}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete candidate date: ${response.statusText}`);
+    return throwApiError(response, "候補日削除に失敗しました。");
   }
-}
-
-/**
- * キャストの可用性一覧を取得します
- */
-export async function listCastAvailabilities(castId: number): Promise<CastAvailability[]> {
-  const response = await fetch(`${API_BASE_URL}/api/casts/${castId}/cast_availabilities`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch cast availabilities: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * 可用性を作成します
- */
-export async function createCastAvailability(data: CastAvailability): Promise<CastAvailability> {
-  const response = await fetch(`${API_BASE_URL}/api/cast_availabilities`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create cast availability: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * 可用性を更新します
- */
-export async function updateCastAvailability(id: number, data: CastAvailability): Promise<CastAvailability> {
-  const response = await fetch(`${API_BASE_URL}/api/cast_availabilities/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update cast availability: ${response.statusText}`);
-  }
-
-  return response.json();
 }
 
 /**
  * プロジェクトの時間枠一覧を取得します
  */
 export async function listTimeSlotsDef(projectId: string): Promise<TimeSlotDef[]> {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/time_slots_def`);
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/time-slots`);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch time slots: ${response.statusText}`);
+    return throwApiError(response, "時間枠一覧の取得に失敗しました。");
   }
 
   return response.json();
@@ -492,8 +355,8 @@ export async function listTimeSlotsDef(projectId: string): Promise<TimeSlotDef[]
 /**
  * 時間枠を作成します
  */
-export async function createTimeSlotDef(data: TimeSlotDef): Promise<TimeSlotDef> {
-  const response = await fetch(`${API_BASE_URL}/api/time_slots_def`, {
+export async function createTimeSlotDef(projectId: string, data: TimeSlotDefInput): Promise<TimeSlotDef> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/time-slots`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -502,7 +365,7 @@ export async function createTimeSlotDef(data: TimeSlotDef): Promise<TimeSlotDef>
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to create time slot: ${response.statusText}`);
+    return throwApiError(response, "時間枠作成に失敗しました。");
   }
 
   return response.json();
@@ -511,8 +374,8 @@ export async function createTimeSlotDef(data: TimeSlotDef): Promise<TimeSlotDef>
 /**
  * 時間枠を更新します
  */
-export async function updateTimeSlotDef(id: number, data: TimeSlotDef): Promise<TimeSlotDef> {
-  const response = await fetch(`${API_BASE_URL}/api/time_slots_def/${id}`, {
+export async function updateTimeSlotDef(projectId: string, id: number, data: TimeSlotDefInput): Promise<TimeSlotDef> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/time-slots/${id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -521,7 +384,7 @@ export async function updateTimeSlotDef(id: number, data: TimeSlotDef): Promise<
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to update time slot: ${response.statusText}`);
+    return throwApiError(response, "時間枠更新に失敗しました。");
   }
 
   return response.json();
@@ -530,12 +393,145 @@ export async function updateTimeSlotDef(id: number, data: TimeSlotDef): Promise<
 /**
  * 時間枠を削除します
  */
-export async function deleteTimeSlotDef(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/time_slots_def/${id}`, {
+export async function deleteTimeSlotDef(projectId: string, id: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/time-slots/${id}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to delete time slot: ${response.statusText}`);
+    return throwApiError(response, "時間枠削除に失敗しました。");
   }
+}
+
+/**
+ * シーンで撮影可能な時間枠一覧を取得します
+ */
+export async function listSceneAllowedTimeSlots(projectId: string, sceneId: number): Promise<SceneAllowedTimeSlot[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${sceneId}/allowed-time-slots`);
+
+  if (!response.ok) {
+    return throwApiError(response, "シーン許可時間枠一覧の取得に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * シーンで撮影可能な時間枠を追加します
+ */
+export async function createSceneAllowedTimeSlot(projectId: string, sceneId: number, timeSlotId: number): Promise<SceneAllowedTimeSlot> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${sceneId}/allowed-time-slots/${timeSlotId}`, {
+    method: "PUT",
+  });
+
+  if (!response.ok) {
+    return throwApiError(response, "シーン許可時間枠作成に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * シーンで撮影可能な時間枠を削除します
+ */
+export async function deleteSceneAllowedTimeSlot(projectId: string, sceneId: number, timeSlotId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${sceneId}/allowed-time-slots/${timeSlotId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    return throwApiError(response, "シーン許可時間枠削除に失敗しました。");
+  }
+}
+
+/**
+ * シーンに必要な役者一覧を取得します
+ */
+export async function listSceneRequiredCasts(projectId: string, sceneId: number): Promise<SceneRequiredCast[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${sceneId}/required-casts`);
+
+  if (!response.ok) {
+    return throwApiError(response, "シーン必要キャスト一覧の取得に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * シーンに必要な役者を追加します
+ */
+export async function createSceneRequiredCast(projectId: string, sceneId: number, castId: number): Promise<SceneRequiredCast> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${sceneId}/required-casts/${castId}`, {
+    method: "PUT",
+  });
+
+  if (!response.ok) {
+    return throwApiError(response, "シーン必要キャスト作成に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * シーンに必要な役者を削除します
+ */
+export async function deleteSceneRequiredCast(projectId: string, sceneId: number, castId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/scenes/${sceneId}/required-casts/${castId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    return throwApiError(response, "シーン必要キャスト削除に失敗しました。");
+  }
+}
+
+/**
+ * キャストの参加可否一覧を取得します
+ */
+export async function listCastAvailabilities(projectId: string, castId: number): Promise<CastAvailability[]> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts/${castId}/availabilities`);
+
+  if (!response.ok) {
+    return throwApiError(response, "キャスト参加可否一覧の取得に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * 参加可否を登録します
+ */
+export async function createCastAvailability(projectId: string, data: CastAvailabilityInput): Promise<CastAvailability> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts/${data.cast_id}/availabilities/${data.candidate_date_id}/${data.time_slot_id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ is_available: data.is_available }),
+  });
+
+  if (!response.ok) {
+    return throwApiError(response, "キャスト参加可否更新に失敗しました。");
+  }
+
+  return response.json();
+}
+
+/**
+ * 参加可否を更新します
+ */
+export async function updateCastAvailability(projectId: string, data: CastAvailabilityInput): Promise<CastAvailability> {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/casts/${data.cast_id}/availabilities/${data.candidate_date_id}/${data.time_slot_id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ is_available: data.is_available }),
+  });
+
+  if (!response.ok) {
+    return throwApiError(response, "キャスト参加可否更新に失敗しました。");
+  }
+
+  return response.json();
 }

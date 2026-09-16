@@ -5,19 +5,19 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/creatio313/movie_scheduler/internal/models"
 	"github.com/creatio313/movie_scheduler/internal/response"
 	"github.com/creatio313/movie_scheduler/internal/validators"
 )
 
-// [POST] /api/time_slots_def : 時間枠の作成
+// [POST] /api/projects/{projectId}/time-slots : 時間枠の作成
 func HandleCreateTimeSlotDef(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		projectID := r.PathValue("projectId")
 		var t models.TimeSlotDef
 		if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			http.Error(w, "無効な要求様式です。", http.StatusBadRequest)
 			return
 		}
 
@@ -37,51 +37,32 @@ func HandleCreateTimeSlotDef(db *sql.DB) http.HandlerFunc {
 		}
 
 		query := "INSERT INTO time_slots_def (project_id, slot_name, start_time, end_time) VALUES (?, ?, ?, ?) RETURNING id"
-		err := db.QueryRowContext(r.Context(), query, t.ProjectID, t.SlotName, startArg, endArg).Scan(&t.ID)
+		err := db.QueryRowContext(r.Context(), query, projectID, t.SlotName, startArg, endArg).Scan(&t.ID)
 		if err != nil {
-			slog.Error("Failed to insert time_slot_def", "error", err, "project_id", t.ProjectID)
-			http.Error(w, "Failed to create time_slot_def", http.StatusInternalServerError)
+			slog.Error("時間枠作成に失敗しました。", "error", err, "project_id", projectID)
+			http.Error(w, "時間枠作成に失敗しました。", http.StatusInternalServerError)
 			return
 		}
+		t.ProjectID = projectID
 
 		// 監査ログ
-		slog.Info("Time slot created", "time_slot_id", t.ID, "slot_name", t.SlotName, "project_id", t.ProjectID)
+		slog.Info("時間枠が作成されました。", "time_slot_id", t.ID, "slot_name", t.SlotName, "project_id", projectID)
 		response.RespondJSON(w, http.StatusCreated, t)
 	}
 }
 
-// [GET] /api/time_slots_def/{id} : 時間枠1件取得
-func HandleGetTimeSlotDef(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-
-		var t models.TimeSlotDef
-		var startTime, endTime sql.NullString
-		err := db.QueryRowContext(r.Context(), "SELECT id, project_id, slot_name, start_time, end_time FROM time_slots_def WHERE id = ?", id).
-			Scan(&t.ID, &t.ProjectID, &t.SlotName, &startTime, &endTime)
-
-		if err == sql.ErrNoRows {
-			http.Error(w, "Time slot definition not found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			slog.Error("Failed to get time_slot_def", "error", err, "time_slot_id", id)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		t.StartTime = startTime.String
-		t.EndTime = endTime.String
-
-		response.RespondJSON(w, http.StatusOK, t)
-	}
-}
-
-// [PUT] /api/time_slots_def/{id} : 時間枠の更新
+// [PUT] /api/projects/{projectId}/time-slots/{timeSlotId} : 時間枠の更新
 func HandleUpdateTimeSlotDef(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
+		projectID := r.PathValue("projectId")
+		id, err := parsePathID(r.PathValue("timeSlotId"))
+		if err != nil {
+			http.Error(w, "時間枠IDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
 		var t models.TimeSlotDef
 		if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			http.Error(w, "無効な要求様式です。", http.StatusBadRequest)
 			return
 		}
 
@@ -100,53 +81,78 @@ func HandleUpdateTimeSlotDef(db *sql.DB) http.HandlerFunc {
 			endArg = t.EndTime
 		}
 
-		_, err := db.ExecContext(r.Context(), "UPDATE time_slots_def SET slot_name = ?, start_time = ?, end_time = ? WHERE id = ?", t.SlotName, startArg, endArg, id)
+		result, err := db.ExecContext(r.Context(), "UPDATE time_slots_def SET slot_name = ?, start_time = ?, end_time = ? WHERE id = ? AND project_id = ?", t.SlotName, startArg, endArg, id, projectID)
 		if err != nil {
-			slog.Error("Failed to update time_slot_def", "error", err, "time_slot_id", id)
-			http.Error(w, "Failed to update time_slot_def", http.StatusInternalServerError)
+			slog.Error("時間枠更新に失敗しました。", "error", err, "time_slot_id", id)
+			http.Error(w, "時間枠更新に失敗しました。", http.StatusInternalServerError)
 			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			http.Error(w, "時間枠更新に失敗しました。", http.StatusInternalServerError)
+			return
+		}
+		if rowsAffected == 0 {
+			var exists bool
+			if err := db.QueryRowContext(r.Context(), "SELECT EXISTS(SELECT 1 FROM time_slots_def WHERE id = ? AND project_id = ?)", id, projectID).Scan(&exists); err != nil {
+				http.Error(w, "時間枠更新に失敗しました。", http.StatusInternalServerError)
+				return
+			}
+			if !exists {
+				http.Error(w, "時間枠定義が見つかりません。", http.StatusNotFound)
+				return
+			}
 		}
 
 		// 監査ログ
-		slog.Info("Time slot updated", "time_slot_id", id, "slot_name", t.SlotName)
-		timeSlotID, err := strconv.Atoi(id)
-		if err != nil {
-			slog.Error("Invalid time_slot ID format", "error", err, "time_slot_id", id)
-			http.Error(w, "Invalid time_slot ID format", http.StatusInternalServerError)
-			return
-		}
-		t.ID = timeSlotID
+		slog.Info("時間枠が更新されました。", "time_slot_id", id, "slot_name", t.SlotName)
+		t.ID = id
+		t.ProjectID = projectID
 		response.RespondJSON(w, http.StatusOK, t)
 	}
 }
 
-// [DELETE] /api/time_slots_def/{id} : 時間枠の削除
+// [DELETE] /api/projects/{projectId}/time-slots/{timeSlotId} : 時間枠の削除
 func HandleDeleteTimeSlotDef(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-
-		_, err := db.ExecContext(r.Context(), "DELETE FROM time_slots_def WHERE id = ?", id)
+		projectID := r.PathValue("projectId")
+		id, err := parsePathID(r.PathValue("timeSlotId"))
 		if err != nil {
-			slog.Error("Failed to delete time_slot_def", "error", err, "time_slot_id", id)
-			http.Error(w, "Failed to delete time_slot_def", http.StatusInternalServerError)
+			http.Error(w, "時間枠IDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
+
+		result, err := db.ExecContext(r.Context(), "DELETE FROM time_slots_def WHERE id = ? AND project_id = ?", id, projectID)
+		if err != nil {
+			slog.Error("時間枠削除に失敗しました。", "error", err, "time_slot_id", id)
+			http.Error(w, "時間枠削除に失敗しました。", http.StatusInternalServerError)
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			http.Error(w, "時間枠削除に失敗しました。", http.StatusInternalServerError)
+			return
+		}
+		if rowsAffected == 0 {
+			http.Error(w, "時間枠定義が見つかりません。", http.StatusNotFound)
 			return
 		}
 
 		// 監査ログ
-		slog.Info("Time slot deleted", "time_slot_id", id)
+		slog.Info("時間枠が削除されました。", "time_slot_id", id)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
-// [GET] /api/projects/{id}/time_slots_def : プロジェクトの時間枠一覧
+// [GET] /api/projects/{projectId}/time-slots : プロジェクトの時間枠一覧
 func HandleListTimeSlotsDefByProject(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		projectID := r.PathValue("id")
+		projectID := r.PathValue("projectId")
 
 		rows, err := db.QueryContext(r.Context(), "SELECT id, project_id, slot_name, start_time, end_time FROM time_slots_def WHERE project_id = ? ORDER BY start_time", projectID)
 		if err != nil {
-			slog.Error("Failed to fetch time_slots_def", "error", err, "project_id", projectID)
-			http.Error(w, "Failed to fetch time_slots_def", http.StatusInternalServerError)
+			slog.Error("時間枠一覧取得に失敗しました。", "error", err, "project_id", projectID)
+			http.Error(w, "時間枠一覧取得に失敗しました。", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -156,7 +162,7 @@ func HandleListTimeSlotsDefByProject(db *sql.DB) http.HandlerFunc {
 			var t models.TimeSlotDef
 			var startTime, endTime sql.NullString
 			if err := rows.Scan(&t.ID, &t.ProjectID, &t.SlotName, &startTime, &endTime); err != nil {
-				http.Error(w, "Failed to read time_slots_def", http.StatusInternalServerError)
+				http.Error(w, "時間枠一覧の読み取りに失敗しました。", http.StatusInternalServerError)
 				return
 			}
 			t.StartTime = startTime.String
@@ -164,7 +170,7 @@ func HandleListTimeSlotsDefByProject(db *sql.DB) http.HandlerFunc {
 			items = append(items, t)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "Failed to read time_slots_def", http.StatusInternalServerError)
+			http.Error(w, "時間枠一覧の読み取りに失敗しました。", http.StatusInternalServerError)
 			return
 		}
 

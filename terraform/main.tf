@@ -1,50 +1,93 @@
-resource "sakura_container_registry" "movie_scheduler_registry" {
-  name        = "撮影計画支援電算システムAPI"
-  description = "撮影計画支援電算処理システムAPIのDockerイメージを格納するためのコンテナレジストリ。"
+data "sakura_container_registry" "mscheduler_container_registry" {
+  id = var.container_registry_resource_id
+}
 
-  subdomain_label = "movie-scheduler-reg-beta"
-  access_level    = "none"
-  icon_id         = var.server_icon
+resource "sakura_database" "movie_scheduler_database" {
+  name        = "撮影計画支援電算システムデータベース"
+  description = "撮影計画支援電算システムデータベース。MariaDB 10.11を使用。"
 
-  user = [
-    {
-      name       = var.container_username
-      password   = var.container_password
-      permission = "all"
-    }
-  ]
+  backup = {
+    days_of_week = ["mon"]
+    time         = "04:00"
+  }
+
+  network_interface = {
+    vswitch_id    = sakura_vswitch.switch_for_database.id
+    ip_address    = var.database_ip
+    netmask       = 24
+    gateway       = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
+    port          = var.database_port
+    source_ranges = var.database_source_ranges
+  }
+
+  username            = var.database_username
+  password_wo         = var.database_password
+  password_wo_version = 1
+
+  database_type    = "mariadb"
+  database_version = "10.11"
+
+  disk = {
+    encryption_algorithm = "aes256_xts"
+    kms_key_id           = sakura_kms.database_key.id
+  }
+
+  icon_id = var.database_icon
+
+  monitoring_suite = {
+    enabled = true
+  }
+
+  parameters = {
+    event_scheduler              = "OFF"
+    innodb_buffer_pool_size      = 134217728
+    log_warnings                 = 2
+    long_query_time              = 10
+    max_allowed_packet           = 16777216
+    max_connections              = 100
+    query_alloc_block_size       = 8192
+    query_cache_limit            = 1048576
+    query_cache_min_res_unit     = 4096
+    query_cache_size             = 536870912
+    query_cache_type             = 0
+    query_cache_wlock_invalidate = "OFF"
+    query_prealloc_size          = 8192
+    slow_query_log               = "ON"
+    sort_buffer_size             = 2097152
+    sql_mode                     = "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
+    tmpdir                       = "/tmp"
+  }
+
+  plan = "10g"
+  tags = ["mscheduler"]
+  zone = var.zone
 }
 
 resource "sakura_kms" "database_key" {
-  name        = "データベース認証用シークレット暗号鍵"
-  description = "データベースのディスクおよびデータベース認証用シークレットを暗号化するためのKMS鍵。"
+  name        = "データ基盤暗号化用鍵"
+  description = "データベースのディスクおよびシークレットを暗号化するためのKMS鍵。"
   key_origin  = "generated"
-}
-
-resource "sakura_secret_manager" "database_secret" {
-  name        = "データベース認証用シークレット"
-  description = "データベース認証用シークレットを格納するためのシークレット保管庫。"
-  kms_key_id  = sakura_kms.database_key.id
-}
-
-resource "sakura_secret_manager_secret" "database_secret_value" {
-  name     = "database_secret_value"
-  vault_id = sakura_secret_manager.database_secret.id
-  value_wo = jsonencode({
-    database_name = var.database_username
-    host          = var.database_ip
-    port          = var.database_port
-    username      = var.database_username
-    password      = var.database_password
-  })
-  value_wo_version = 1
+  tags        = ["mscheduler"]
 }
 
 resource "sakura_packet_filter" "apprun_lb_eth" {
-  name        = "Webサーバー用パケットフィルタ"
-  description = "Webサーバー用のパケットフィルタ。非HTTPアクセスをブロックするためのフィルタルールを定義。"
+  name        = "ロードバランサ外部用パケットフィルタ"
+  description = "ロードバランサ外部用のパケットフィルタ。非HTTPアクセスをブロックするためのフィルタルールを定義。"
 
   zone = var.zone
+}
+
+resource "sakura_packet_filter" "lb_switch" {
+  name        = "ロードバランサ内部NIC用パケットフィルタ"
+  description = "ロードバランサ内部NIC用のパケットフィルタ。内部通信を制御するためのフィルタルールを定義。"
+
+  zone = var.zone
+}
+
+resource "sakura_packet_filter" "worker_switch" {
+  name        = "ワーカー用パケットフィルタ"
+  description = "ワーカー用のパケットフィルタ。内部通信を制御するためのフィルタルールを定義。"
+  zone        = var.zone
 }
 
 resource "sakura_packet_filter_rules" "apprun_lb_eth_rules" {
@@ -86,13 +129,6 @@ resource "sakura_packet_filter_rules" "apprun_lb_eth_rules" {
   ]
 }
 
-resource "sakura_packet_filter" "lb_switch" {
-  name        = "Webサーバ内部NIC用パケットフィルタ"
-  description = "Webサーバー内部NIC用のパケットフィルタ。内部通信を制御するためのフィルタルールを定義。"
-
-  zone = var.zone
-}
-
 resource "sakura_packet_filter_rules" "lb_switch_rules" {
   packet_filter_id = sakura_packet_filter.lb_switch.id
   zone             = var.zone
@@ -126,11 +162,6 @@ resource "sakura_packet_filter_rules" "lb_switch_rules" {
       description = "Deny ALL"
     }
   ]
-}
-
-resource "sakura_packet_filter" "worker_switch" {
-  name        = "APIサーバ用パケットフィルタ"
-  description = "APIサーバ用のパケットフィルタ。内部通信を制御するためのフィルタルールを定義。"
 }
 
 resource "sakura_packet_filter_rules" "worker_switch_rules" {
@@ -168,71 +199,77 @@ resource "sakura_packet_filter_rules" "worker_switch_rules" {
   ]
 }
 
-resource "sakura_vswitch" "switch_for_database" {
-  name        = "データベース接続用スイッチ"
-  description = "VPNルータとデータベースを接続するためのスイッチ。"
-
-  icon_id = var.database_icon
-  zone    = var.zone
+resource "sakura_secret_manager" "database_secret" {
+  name        = "認証情報格納庫"
+  description = "データベース認証用シークレットを格納するためのシークレットマネージャ。"
+  tags        = ["mscheduler"]
+  kms_key_id  = sakura_kms.database_key.id
 }
 
-resource "sakura_database" "movie_scheduler_database" {
-  name        = "撮影計画支援電算システムデータベース"
-  description = "撮影計画支援電算システムデータベース。MariaDB 10.11を使用。"
+resource "sakura_secret_manager_secret" "database_secret_value" {
+  name             = "movie_schedule_db_password"
+  vault_id         = sakura_secret_manager.database_secret.id
+  value_wo         = var.database_password
+  value_wo_version = 1
+}
 
-  backup = {
-    days_of_week = ["mon"]
-    time         = "04:00"
+resource "sakura_seg" "seg_for_apprun_dedicated" {
+  netmask             = 24
+  server_ip_addresses = [var.seg_internal_ip]
+  vswitch_id          = sakura_vswitch.switch_for_database.id
+  zone                = sakura_vswitch.switch_for_database.zone
+
+  endpoint_setting = {
+    apprun_dedicated_control_enabled = true
+    container_registry_endpoints     = [data.sakura_container_registry.mscheduler_container_registry.fqdn]
+    monitoring_suite_endpoints       = [sakura_monitoring_suite_log_storage.mscheduler_log_storage.endpoints.ingester.address, sakura_monitoring_suite_metric_storage.mscheduler_metric_storage.endpoints.address]
+    object_storage_endpoints         = ["s3.${data.sakura_object_storage_site.ishikari.endpoint}"]
+  }
+  monitoring_suite_enabled = true
+}
+
+resource "sakura_simple_monitor" "mscheduler_simple_monitor" {
+  description = "撮影計画支援電算処理システムの稼働状況を監視する。"
+
+  target  = var.mscheduler_api_domain
+  enabled = true
+
+  delay_loop = 60
+  timeout    = 10
+
+  max_check_attempts = 3
+  retry_interval     = 10
+
+  health_check = {
+    protocol        = "https"
+    port            = 443
+    path            = "/healthz"
+    contains_string = "ok"
+    status          = "200"
+    host_header     = var.mscheduler_api_domain
+    sni             = false
+    verify_sni      = false
+    http2           = false
   }
 
-  network_interface = {
-    vswitch_id    = sakura_vswitch.switch_for_database.id
-    ip_address    = var.database_ip
-    netmask       = 24
-    gateway       = sakura_vpn_router.standard_vpn_router.private_network_interface[0].ip_addresses[0]
-    port          = var.database_port
-    source_ranges = concat(var.database_source_ranges, ["${var.database_operator_global_ip}"])
-  }
+  tags = ["mscheduler"]
 
-  username            = var.database_username
-  password_wo         = var.database_password
-  password_wo_version = 1
-
-  database_type    = "mariadb"
-  database_version = "10.11"
-
-  disk = {
-    encryption_algorithm = "aes256_xts"
-    kms_key_id           = sakura_kms.database_key.id
-  }
-
-  icon_id = var.database_icon
+  notify_email_enabled = true
+  notify_email_html    = false
+  notify_slack_enabled = false
 
   monitoring_suite = {
     enabled = true
   }
-  # 基盤が弱いため、キャッシュはOFFにする
-  parameters = {
-    event_scheduler              = "OFF"
-    innodb_buffer_pool_size      = 134217728
-    log_warnings                 = 2
-    long_query_time              = 10
-    max_allowed_packet           = 16777216
-    max_connections              = 100
-    query_alloc_block_size       = 8192
-    query_cache_limit            = 1048576
-    query_cache_min_res_unit     = 4096
-    query_cache_size             = 536870912
-    query_cache_type             = 0
-    query_cache_wlock_invalidate = "OFF"
-    query_prealloc_size          = 8192
-    slow_query_log               = "ON"
-    sort_buffer_size             = 2097152
-    sql_mode                     = "STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"
-    tmpdir                       = "/tmp"
-  }
-  plan = "10g"
-  zone = var.zone
+}
+
+resource "sakura_vswitch" "switch_for_database" {
+  name        = "データベース接続用スイッチ"
+  description = "データベースと接続するためのスイッチ。"
+
+  icon_id = var.database_icon
+  tags    = ["mscheduler"]
+  zone    = var.zone
 }
 
 resource "sakura_vpn_router" "standard_vpn_router" {
@@ -240,22 +277,38 @@ resource "sakura_vpn_router" "standard_vpn_router" {
   description = "外部接続用VPNルータ。データベースへの安全な接続を提供。"
 
   firewall = [{
-    interface_index = 0
+    interface_index = 1
     direction       = "receive"
     expression = [
       {
-        protocol         = "tcp"
-        source_network   = var.database_operator_global_ip
-        destination_port = "443"
-        allow            = true
-        logging          = true
-        description      = "データベースオペレーターのHTTPSアクセスを許可"
+        protocol            = "tcp"
+        source_network      = "192.168.1.64/26"
+        source_port         = ""
+        destination_network = ""
+        destination_port    = "443"
+        allow               = true
+        logging             = true
+        description         = "AppRunワーカーから外部APIへのHTTPS通信を許可する。"
       },
       {
-        protocol    = "ip"
-        allow       = false
-        logging     = true
-        description = "他トラフィックを拒否"
+        protocol            = "tcp"
+        source_network      = "192.168.1.0/24"
+        source_port         = ""
+        destination_network = var.database_ip
+        destination_port    = "3306"
+        allow               = true
+        logging             = true
+        description         = "VPNで接続したクライアントにデータベースアプライアンスへの接続を許可する。"
+      },
+      {
+        protocol            = "ip"
+        source_network      = ""
+        source_port         = ""
+        destination_network = ""
+        destination_port    = ""
+        allow               = false
+        logging             = true
+        description         = "その他のアクセスを拒否する。"
     }]
   }]
 
@@ -267,15 +320,6 @@ resource "sakura_vpn_router" "standard_vpn_router" {
   }
 
   plan = "standard"
-
-  port_forwarding = [
-    {
-      protocol     = "tcp"
-      public_port  = 7777
-      private_ip   = var.database_ip
-      private_port = 443
-      description  = "データベースオペレーターのHTTPSアクセスを許可"
-  }]
 
   private_network_interface = [{
     index        = 1
@@ -289,17 +333,19 @@ resource "sakura_vpn_router" "standard_vpn_router" {
     hour        = 4
   }
 
+  wire_guard = {
+    ip_address = "10.0.0.1/24"
+    peer = [
+      {
+        name       = "VPNクライアント"
+        ip_address = "10.0.0.2"
+        public_key = var.vpn_peer_public_key
+      },
+    ]
+  }
+
+  tags = ["mscheduler"]
+
   version = 2
   zone    = var.zone
-}
-
-# Outputs for the application
-output "database_secret_vault_id" {
-  description = "The Vault ID of the database secret for Secret Manager"
-  value       = sakura_secret_manager.database_secret.id
-}
-
-output "database_secret_name" {
-  description = "The name of the database secret"
-  value       = sakura_secret_manager_secret.database_secret_value.name
 }

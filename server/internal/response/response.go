@@ -12,7 +12,7 @@ func RespondJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.WriteHeader(status)
 	if payload != nil {
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			slog.Error("Failed to encode response", "error", err)
+			slog.Error("応答のエンコードに失敗しました。", "error", err)
 		}
 	}
 }

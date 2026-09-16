@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // MariaDB/MySQL用標準ドライバ
@@ -22,54 +23,55 @@ func main() {
 	var db *sql.DB
 	var err error
 
-	// Try to get database credentials from Secret Manager first
+	// シークレットマネージャからMariaDBのパスワードを取得できるようにする。
 	vaultID := os.Getenv("SAKURA_VAULT_ID")
 	secretName := os.Getenv("SAKURA_SECRET_NAME")
+	zone := os.Getenv("SAKURA_API_ZONE")
 
-	if vaultID != "" {
-		// Fetch database secret from Secret Manager
-		client, err := secretmanager.NewSecretClient(vaultID, secretName)
-		if err != nil {
-			slog.Error("Failed to create Secret Manager client", "error", err)
-			os.Exit(1)
-		}
+	// MariaDB接続に必要な環境変数を取得。
+	dbHost := os.Getenv("DB_HOST")
+	dbPortRaw := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	dbUser := os.Getenv("DB_USER")
 
-		dbSecret, err := client.FetchDatabaseSecret()
-		if err != nil {
-			slog.Error("Failed to fetch database secret", "error", err.Error())
-			os.Exit(1)
-		}
-
-		// Construct DSN from secret
-		dbDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbSecret.Username, dbSecret.Password, dbSecret.Host, dbSecret.Port, dbSecret.DatabaseName)
-
-		// Open database connection
-		db, err = sql.Open("mysql", dbDsn)
-		if err != nil {
-			slog.Error("DB connection failed", "error", err)
-			os.Exit(1)
-		}
-		db.SetMaxOpenConns(10)
-		db.SetMaxIdleConns(5)
-		db.SetConnMaxLifetime(5 * time.Minute)
-		defer db.Close()
-	} else {
-		// Fallback to environment variable if Secret Manager is not configured
-		dbDsn := os.Getenv("DB_DSN")
-		if dbDsn != "" {
-			db, err = sql.Open("mysql", dbDsn)
-			if err != nil {
-				slog.Error("DB connection failed", "error", err)
-				os.Exit(1)
-			}
-			db.SetMaxOpenConns(10)
-			db.SetMaxIdleConns(5)
-			db.SetConnMaxLifetime(5 * time.Minute)
-			defer db.Close()
-		} else {
-			slog.Warn("Neither SAKURA_VAULT_ID nor DB_DSN is set, running without DB connection")
-		}
+	if vaultID == "" {
+		slog.Error("SAKURA_VAULT_IDは必須項目です。")
+		os.Exit(1)
 	}
+	if dbHost == "" || dbPortRaw == "" || dbName == "" || dbUser == "" {
+		slog.Error("DB_HOST, DB_PORT, DB_NAME, および DB_USER は必須項目です。")
+		os.Exit(1)
+	}
+
+	dbPort, err := strconv.Atoi(dbPortRaw)
+	if err != nil {
+		slog.Error("DB_PORTは整数である必要があります。", "error", err)
+		os.Exit(1)
+	}
+
+	client, err := secretmanager.NewSecretClient(vaultID, secretName, zone)
+	if err != nil {
+		slog.Error("シークレットマネージャのクライアント作成に失敗しました。", "error", err)
+		os.Exit(1)
+	}
+
+	dbPassword, err := client.FetchDatabasePassword()
+	if err != nil {
+		slog.Error("シークレットマネージャからのMariaDBパスワード取得に失敗しました。", "error", err)
+		os.Exit(1)
+	}
+
+	dbDsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+
+	db, err = sql.Open("mysql", dbDsn)
+	if err != nil {
+		slog.Error("MariaDB接続に失敗しました。", "error", err)
+		os.Exit(1)
+	}
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	defer db.Close()
 
 	// 3. サーバーの起動
 	if err := server.Start(db); err != nil {

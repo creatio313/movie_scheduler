@@ -5,114 +5,101 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/creatio313/movie_scheduler/internal/models"
 	"github.com/creatio313/movie_scheduler/internal/response"
+	"github.com/creatio313/movie_scheduler/internal/validators"
 )
 
-// [POST] /api/cast_availabilities : 役者スケジュール可用性の作成
-func HandleCreateCastAvailability(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var c models.CastAvailability
-		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
-			return
-		}
-
-		query := "INSERT INTO cast_availabilities (candidate_date_id, time_slot_id, cast_id, is_available) VALUES (?, ?, ?, ?) RETURNING id"
-		err := db.QueryRowContext(r.Context(), query, c.CandidateDateID, c.TimeSlotID, c.CastID, c.IsAvailable).Scan(&c.ID)
-		if err != nil {
-			slog.Error("Failed to insert cast_availability", "error", err, "cast_id", c.CastID)
-			http.Error(w, "Failed to create cast_availability", http.StatusInternalServerError)
-			return
-		}
-
-		// 監査ログ
-		slog.Info("Cast availability created", "availability_id", c.ID, "cast_id", c.CastID, "is_available", c.IsAvailable)
-		response.RespondJSON(w, http.StatusCreated, c)
-	}
-}
-
-// [GET] /api/cast_availabilities/{id} : 役者スケジュール可用性1件取得
-func HandleGetCastAvailability(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-
-		var c models.CastAvailability
-		err := db.QueryRowContext(r.Context(), "SELECT id, candidate_date_id, time_slot_id, cast_id, is_available FROM cast_availabilities WHERE id = ?", id).
-			Scan(&c.ID, &c.CandidateDateID, &c.TimeSlotID, &c.CastID, &c.IsAvailable)
-
-		if err == sql.ErrNoRows {
-			http.Error(w, "Cast availability not found", http.StatusNotFound)
-			return
-		} else if err != nil {
-			slog.Error("Failed to get cast_availability", "error", err, "availability_id", id)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		response.RespondJSON(w, http.StatusOK, c)
-	}
-}
-
-// [PUT] /api/cast_availabilities/{id} : 役者スケジュール可用性の更新
+// [PUT] /api/projects/{projectId}/casts/{castId}/availabilities/{candidateDateId}/{timeSlotId} : 可用性の作成・更新
 func HandleUpdateCastAvailability(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
+		projectID := r.PathValue("projectId")
+		castID, err := parsePathID(r.PathValue("castId"))
+		if err != nil {
+			http.Error(w, "キャストIDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
+		candidateDateID, err := parsePathID(r.PathValue("candidateDateId"))
+		if err != nil {
+			http.Error(w, "候補日IDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
+		timeSlotID, err := parsePathID(r.PathValue("timeSlotId"))
+		if err != nil {
+			http.Error(w, "時間枠IDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
 		var c models.CastAvailability
 		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
+			http.Error(w, "無効な要求様式です。", http.StatusBadRequest)
 			return
 		}
 
-		_, err := db.ExecContext(r.Context(), "UPDATE cast_availabilities SET is_available = ? WHERE id = ?", c.IsAvailable, id)
-		if err != nil {
-			slog.Error("Failed to update cast_availability", "error", err, "availability_id", id)
-			http.Error(w, "Failed to update cast_availability", http.StatusInternalServerError)
+		if err := validators.ValidateCastAvailability(c); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// 監査ログ
-		slog.Info("Cast availability updated", "availability_id", id, "is_available", c.IsAvailable)
-		availID, err := strconv.Atoi(id)
+		query := `
+INSERT INTO cast_availabilities (candidate_date_id, time_slot_id, cast_id, is_available)
+SELECT cd.id, ts.id, c.id, ?
+FROM candidate_dates cd
+JOIN time_slots_def ts ON ts.id = ? AND ts.project_id = cd.project_id
+JOIN casts c ON c.id = ? AND c.project_id = cd.project_id
+WHERE cd.id = ? AND cd.project_id = ?
+ON DUPLICATE KEY UPDATE is_available = VALUES(is_available)`
+		_, err = db.ExecContext(r.Context(), query, c.IsAvailable, timeSlotID, castID, candidateDateID, projectID)
 		if err != nil {
-			slog.Error("Invalid availability ID format", "error", err, "availability_id", id)
-			http.Error(w, "Invalid availability ID format", http.StatusInternalServerError)
+			slog.Error("キャスト参加可否更新に失敗しました。", "error", err, "cast_id", castID)
+			http.Error(w, "キャスト参加可否更新に失敗しました。", http.StatusInternalServerError)
 			return
 		}
-		c.ID = availID
+
+		err = db.QueryRowContext(r.Context(), `
+SELECT ca.id, ca.candidate_date_id, ca.time_slot_id, ca.cast_id, ca.is_available
+FROM cast_availabilities ca
+JOIN candidate_dates cd ON cd.id = ca.candidate_date_id
+JOIN time_slots_def ts ON ts.id = ca.time_slot_id AND ts.project_id = cd.project_id
+JOIN casts c ON c.id = ca.cast_id AND c.project_id = cd.project_id
+WHERE ca.candidate_date_id = ? AND ca.time_slot_id = ? AND ca.cast_id = ? AND cd.project_id = ?`, candidateDateID, timeSlotID, castID, projectID).
+			Scan(&c.ID, &c.CandidateDateID, &c.TimeSlotID, &c.CastID, &c.IsAvailable)
+		if err == sql.ErrNoRows {
+			http.Error(w, "キャスト、候補日、または時間枠が見つかりません。", http.StatusNotFound)
+			return
+		} else if err != nil {
+			slog.Error("キャスト参加可否取得に失敗しました。", "error", err, "cast_id", castID)
+			http.Error(w, "サーバー内部でエラーが発生しました。", http.StatusInternalServerError)
+			return
+		}
+
+		slog.Info("キャスト参加可否が更新されました。", "availability_id", c.ID, "is_available", c.IsAvailable)
 		response.RespondJSON(w, http.StatusOK, c)
 	}
 }
 
-// [DELETE] /api/cast_availabilities/{id} : 役者スケジュール可用性の削除
-func HandleDeleteCastAvailability(db *sql.DB) http.HandlerFunc {
+// [GET] /api/projects/{projectId}/casts/{castId}/availabilities : 役者の可用性一覧
+func HandleListCastAvailabilitiesByCast(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-
-		_, err := db.ExecContext(r.Context(), "DELETE FROM cast_availabilities WHERE id = ?", id)
+		projectID := r.PathValue("projectId")
+		castID, err := parsePathID(r.PathValue("castId"))
 		if err != nil {
-			slog.Error("Failed to delete cast_availability", "error", err, "availability_id", id)
-			http.Error(w, "Failed to delete cast_availability", http.StatusInternalServerError)
+			http.Error(w, "キャストIDの形式が不正です。", http.StatusBadRequest)
 			return
 		}
 
-		// 監査ログ
-		slog.Info("Cast availability deleted", "availability_id", id)
-		w.WriteHeader(http.StatusNoContent)
-	}
-}
-
-// [GET] /api/casts/{id}/cast_availabilities : 役者の可用性一覧
-func HandleListCastAvailabilitiesByCast(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		castID := r.PathValue("id")
-
-		rows, err := db.QueryContext(r.Context(), "SELECT id, candidate_date_id, time_slot_id, cast_id, is_available FROM cast_availabilities WHERE cast_id = ? ORDER BY candidate_date_id, time_slot_id", castID)
+		query := `
+SELECT ca.id, ca.candidate_date_id, ca.time_slot_id, ca.cast_id, ca.is_available
+FROM cast_availabilities ca
+JOIN candidate_dates cd ON cd.id = ca.candidate_date_id
+JOIN time_slots_def ts ON ts.id = ca.time_slot_id AND ts.project_id = cd.project_id
+JOIN casts c ON c.id = ca.cast_id AND c.project_id = cd.project_id
+WHERE ca.cast_id = ? AND c.project_id = ?
+ORDER BY ca.candidate_date_id, ca.time_slot_id`
+		rows, err := db.QueryContext(r.Context(), query, castID, projectID)
 		if err != nil {
-			slog.Error("Failed to fetch cast_availabilities", "error", err, "cast_id", castID)
-			http.Error(w, "Failed to fetch cast_availabilities", http.StatusInternalServerError)
+			slog.Error("キャスト参加可否一覧取得に失敗しました。", "error", err, "cast_id", castID)
+			http.Error(w, "キャスト参加可否一覧取得に失敗しました。", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -121,13 +108,13 @@ func HandleListCastAvailabilitiesByCast(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var c models.CastAvailability
 			if err := rows.Scan(&c.ID, &c.CandidateDateID, &c.TimeSlotID, &c.CastID, &c.IsAvailable); err != nil {
-				http.Error(w, "Failed to read cast_availabilities", http.StatusInternalServerError)
+				http.Error(w, "キャスト参加可否一覧の読み取りに失敗しました。", http.StatusInternalServerError)
 				return
 			}
 			items = append(items, c)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "Failed to read cast_availabilities", http.StatusInternalServerError)
+			http.Error(w, "キャスト参加可否一覧の読み取りに失敗しました。", http.StatusInternalServerError)
 			return
 		}
 

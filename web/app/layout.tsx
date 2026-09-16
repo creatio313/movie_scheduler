@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   title: "撮影計画支援電算処理システム",
   description: "候補日時と役者のスケジュールから、シーン別の撮影可能日時を算出します。",
   icons: {
-    icon: "/favicon.png",
+    icon: "/favicon.svg",
   },
   openGraph: {
     title: "撮影計画支援電算処理システム",
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     locale: "ja_JP",
     images: [
       {
-        url: "/ogp_image.png",
+        url: "/ogp.jpg",
         width: 192,
         height: 192,
         alt: "撮影計画支援電算処理システム",

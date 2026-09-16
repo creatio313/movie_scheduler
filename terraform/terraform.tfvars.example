@@ -1,7 +1,59 @@
-access_token                = "YOUR_ACCESS_TOKEN_HERE"
-access_token_secret         = "YOUR_ACCESS_TOKEN_SECRET_HERE"
-container_username          = "YOUR_CONTAINER_USERNAME_HERE"
-container_password          = "YOUR_CONTAINER_PASSWORD_HERE"
-database_password           = "YOUR_DATABASE_PASSWORD_HERE"
-database_port               = 3306
-database_operator_global_ip = "YOUR_DATABASE_OPERATOR_IP_HERE"
+# Sakura Cloud API 認証情報
+# コントロールパネルで発行したアクセストークンを指定します。
+access_token = "あなたのアクセストークン"
+
+# コントロールパネルで発行したアクセストークンシークレットを指定します。
+access_token_secret = "あなたのアクセストークンシークレット"
+
+# AppRun Dedicated の Let's Encrypt 証明書通知に使うメールアドレスです。
+apprun_dedicated_lets_encrypt_email = "admin@example.com"
+
+# 公開する API の独自ドメインです。
+mscheduler_api_domain = "mscheduler-api.example.com"
+
+# 公開する SPA の独自ドメインです。
+mscheduler_spa_domain = "mscheduler-spa.example.com"
+
+# AppRun がコンテナレジストリからイメージを pull するための認証情報です。
+container_username = "コンテナレジストリのユーザー名"
+container_password = "コンテナレジストリのパスワード"
+
+# さくらのクラウド上のコンテナレジストリのリソースIDです。
+container_registry_resource_id = "123456789012"
+
+# AppRun にデプロイする API コンテナイメージ名です。
+mscheduler_image = "mscheduler-api:latest"
+
+# データベース設定です。
+database_ip            = "192.168.1.11"
+database_port          = 5432
+database_username      = "movie_schedule"
+database_password      = "データベースのパスワード"
+database_source_ranges = ["192.168.1.0/24", "10.0.0.2/32"]
+
+# シークレットマネージャの値を AppRun から参照するためのサービスプリンシパル情報です。
+sakura_service_principal_for_secret_unveil_resource_id = "123456789012"
+sakura_service_principal_key_for_secret_unveil_id      = "サービスプリンシパルキーID"
+sakura_service_principal_private_key_for_secret_unveil = <<EOT
+-----BEGIN PRIVATE KEY-----
+ここにサービスプリンシパルの秘密鍵を貼り付けます
+-----END PRIVATE KEY-----
+EOT
+
+# AppRun Dedicated クラスタ作成に使うサービスプリンシパルIDです。
+service_principal_id = "123456789012"
+
+# 内部ネットワーク設定です。既存ネットワークと重複しない値にしてください。
+seg_internal_ip = "192.168.1.2"
+vpn_internal_ip = "192.168.1.1"
+
+# WireGuard クライアント側の公開鍵です。
+vpn_peer_public_key = "WireGuardピアの公開鍵"
+
+# アイコンIDです。変更不要であればデフォルト値のままで問題ありません。
+database_icon = "113602453019"
+server_icon   = "112901627749"
+vpn_icon      = "112300511393"
+
+# 作成先ゾーンです。
+zone = "is1c"

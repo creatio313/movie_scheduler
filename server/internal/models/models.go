@@ -7,6 +7,19 @@ type Project struct {
 	Description string `json:"description"`
 }
 
+// ProjectHome はプロジェクトホーム画面に必要な情報を表す構造体
+type ProjectHome struct {
+	Project Project            `json:"project"`
+	Scenes  []ProjectHomeScene `json:"scenes"`
+}
+
+// ProjectHomeScene はプロジェクトホーム画面のシーン情報を表す構造体
+type ProjectHomeScene struct {
+	Scene          Scene                  `json:"scene"`
+	RequiredCasts  []Cast                 `json:"required_casts"`
+	Availabilities []SceneAvailabilityRow `json:"availabilities"`
+}
+
 // Cast は casts テーブルのデータを表す構造体
 type Cast struct {
 	ID        int    `json:"id"`
@@ -22,6 +35,17 @@ type Scene struct {
 	ProjectID   string `json:"project_id"`
 	SceneName   string `json:"scene_name"`
 	Description string `json:"description"`
+}
+
+// SceneAvailabilityRow はシーンごとの撮影可能日時を表す構造体
+type SceneAvailabilityRow struct {
+	SceneID    int    `json:"scene_id"`
+	SceneName  string `json:"scene_name"`
+	TargetDate string `json:"target_date"`
+	TimeSlotID int    `json:"time_slot_id"`
+	SlotName   string `json:"slot_name"`
+	StartTime  string `json:"start_time"`
+	EndTime    string `json:"end_time"`
 }
 
 // CandidateDate は candidate_dates テーブルのデータを表す構造体

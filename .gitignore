@@ -59,3 +59,6 @@ terraform/.terraform/
 
 # Terraform SSH keys
 terraform/.ssh/
+
+# keys
+keys/*

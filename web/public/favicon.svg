@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="redGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff5a5a"/>
+      <stop offset="100%" stop-color="#b30000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="512" cy="512" r="460" fill="url(#redGrad)"/>
+
+  <!-- Outer targeting ring -->
+  <circle cx="512" cy="512" r="280"
+          fill="none"
+          stroke="white"
+          stroke-width="28"
+          opacity="0.9"/>
+
+  <!-- Camera aperture -->
+  <circle cx="512" cy="512" r="170"
+          fill="#ffffff"
+          opacity="0.95"/>
+
+  <circle cx="512" cy="512" r="95"
+          fill="#d00000"/>
+
+  <!-- Crosshair -->
+  <line x1="512" y1="180" x2="512" y2="300"
+        stroke="white"
+        stroke-width="24"
+        stroke-linecap="round"/>
+  <line x1="512" y1="724" x2="512" y2="844"
+        stroke="white"
+        stroke-width="24"
+        stroke-linecap="round"/>
+  <line x1="180" y1="512" x2="300" y2="512"
+        stroke="white"
+        stroke-width="24"
+        stroke-linecap="round"/>
+  <line x1="724" y1="512" x2="844" y2="512"
+        stroke="white"
+        stroke-width="24"
+        stroke-linecap="round"/>
+
+  <!-- Processing nodes -->
+  <circle cx="512" cy="140" r="22" fill="white"/>
+  <circle cx="884" cy="512" r="22" fill="white"/>
+  <circle cx="512" cy="884" r="22" fill="white"/>
+  <circle cx="140" cy="512" r="22" fill="white"/>
+
+  <!-- Subtle grid / computation feel -->
+  <circle cx="512" cy="512" r="360"
+          fill="none"
+          stroke="white"
+          stroke-width="10"
+          opacity="0.18"/>
+</svg>

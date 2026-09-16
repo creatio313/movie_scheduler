@@ -14,10 +14,10 @@ export interface ValidationResult {
  */
 export function validateProjectTitle(title: string): ValidationResult {
   if (!title || title.trim() === "") {
-    return { isValid: false, error: "プロジェクト名は必須です" };
+    return { isValid: false, error: "プロジェクト名は必須です。" };
   }
   if (title.length > 255) {
-    return { isValid: false, error: "プロジェクト名は255文字以内で入力してください" };
+    return { isValid: false, error: "プロジェクト名は255文字以内で入力してください。" };
   }
   return { isValid: true };
 }
@@ -29,25 +29,25 @@ export function validateProjectTitle(title: string): ValidationResult {
  */
 export function validateCastName(name: string): ValidationResult {
   if (!name || name.trim() === "") {
-    return { isValid: false, error: "役者名は必須です" };
+    return { isValid: false, error: "役者名は必須です。" };
   }
   if (name.length > 100) {
-    return { isValid: false, error: "役者名は100文字以内で入力してください" };
+    return { isValid: false, error: "役者名は100文字以内で入力してください。" };
   }
   return { isValid: true };
 }
 
 /**
- * キャスト役名を検証します
+ * 役名を検証します
  * - 必須
  * - 100文字以内
  */
 export function validateCastRole(role: string): ValidationResult {
   if (!role || role.trim() === "") {
-    return { isValid: false, error: "役名は必須です" };
+    return { isValid: false, error: "役名は必須です。" };
   }
   if (role.length > 100) {
-    return { isValid: false, error: "役名は100文字以内で入力してください" };
+    return { isValid: false, error: "役名は100文字以内で入力してください。" };
   }
   return { isValid: true };
 }
@@ -59,10 +59,10 @@ export function validateCastRole(role: string): ValidationResult {
  */
 export function validateSceneName(name: string): ValidationResult {
   if (!name || name.trim() === "") {
-    return { isValid: false, error: "シーン名は必須です" };
+    return { isValid: false, error: "シーン名は必須です。" };
   }
   if (name.length > 20) {
-    return { isValid: false, error: "シーン名は20文字以内で入力してください" };
+    return { isValid: false, error: "シーン名は20文字以内で入力してください。" };
   }
   return { isValid: true };
 }
@@ -74,17 +74,17 @@ export function validateSceneName(name: string): ValidationResult {
  */
 export function validateCandidateDate(date: string): ValidationResult {
   if (!date || date.trim() === "") {
-    return { isValid: false, error: "候補日は必須です" };
+    return { isValid: false, error: "候補日は必須です。" };
   }
   // YYYY-MM-DD形式チェック
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRegex.test(date)) {
-    return { isValid: false, error: "候補日はYYYY-MM-DD形式で入力してください" };
+    return { isValid: false, error: "候補日はYYYY-MM-DD形式で入力してください。" };
   }
   // 有効な日付かチェック
   const parsedDate = new Date(date + "T00:00:00");
   if (isNaN(parsedDate.getTime())) {
-    return { isValid: false, error: "有効な日付を入力してください" };
+    return { isValid: false, error: "有効な日付を入力してください。" };
   }
   return { isValid: true };
 }
@@ -96,10 +96,10 @@ export function validateCandidateDate(date: string): ValidationResult {
  */
 export function validateTimeSlotName(name: string): ValidationResult {
   if (!name || name.trim() === "") {
-    return { isValid: false, error: "時間枠名は必須です" };
+    return { isValid: false, error: "時間枠名は必須です。" };
   }
   if (name.length > 50) {
-    return { isValid: false, error: "時間枠名は50文字以内で入力してください" };
+    return { isValid: false, error: "時間枠名は50文字以内で入力してください。" };
   }
   return { isValid: true };
 }
@@ -129,12 +129,12 @@ export function validateTime(time: string): ValidationResult {
     [hours, minutes] = time.split(":").map(Number);
     seconds = 0;
   } else {
-    return { isValid: false, error: "時刻はHH:MM形式で入力してください" };
+    return { isValid: false, error: "時刻はHH:MM形式で入力してください。" };
   }
   
   // 有効な時刻かチェック
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) {
-    return { isValid: false, error: "有効な時刻を入力してください" };
+    return { isValid: false, error: "有効な時刻を入力してください。" };
   }
   return { isValid: true };
 }
@@ -185,7 +185,7 @@ export function validateTimeRange(startTime: string, endTime: string): Validatio
   // 両方入力されている場合、開始時刻 < 終了時刻をチェック
   if (startTime && startTime.trim() !== "" && endTime && endTime.trim() !== "") {
     if (startTime >= endTime) {
-      return { isValid: false, error: "開始時刻は終了時刻より前である必要があります" };
+      return { isValid: false, error: "開始時刻は終了時刻より前である必要があります。" };
     }
   }
 

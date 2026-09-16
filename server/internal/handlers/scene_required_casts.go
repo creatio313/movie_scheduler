@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -10,78 +9,119 @@ import (
 	"github.com/creatio313/movie_scheduler/internal/response"
 )
 
-// [POST] /api/scene_required_casts : シーン必要役者の作成
+// [PUT] /api/projects/{projectId}/scenes/{sceneId}/required-casts/{castId} : シーン必要役者の追加
 func HandleCreateSceneRequiredCast(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var s models.SceneRequiredCast
-		if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
-			http.Error(w, "Invalid request payload", http.StatusBadRequest)
-			return
-		}
-
-		query := "INSERT INTO scene_required_casts (scene_id, cast_id) VALUES (?, ?) RETURNING id"
-		err := db.QueryRowContext(r.Context(), query, s.SceneID, s.CastID).Scan(&s.ID)
+		projectID := r.PathValue("projectId")
+		sceneID, err := parsePathID(r.PathValue("sceneId"))
 		if err != nil {
-			slog.Error("Failed to insert scene_required_cast", "error", err, "scene_id", s.SceneID)
-			http.Error(w, "Failed to create scene_required_cast", http.StatusInternalServerError)
+			http.Error(w, "シーンIDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
+		castID, err := parsePathID(r.PathValue("castId"))
+		if err != nil {
+			http.Error(w, "キャストIDの形式が不正です。", http.StatusBadRequest)
 			return
 		}
 
-		// 監査ログ
-		slog.Info("Scene required cast created", "id", s.ID, "scene_id", s.SceneID, "cast_id", s.CastID)
-		response.RespondJSON(w, http.StatusCreated, s)
-	}
-}
+		query := `
+INSERT IGNORE INTO scene_required_casts (scene_id, cast_id)
+SELECT s.id, c.id
+FROM scenes s
+JOIN casts c ON c.id = ? AND c.project_id = s.project_id
+WHERE s.id = ? AND s.project_id = ?`
+		_, err = db.ExecContext(r.Context(), query, castID, sceneID, projectID)
+		if err != nil {
+			slog.Error("シーン必要キャスト作成に失敗しました。", "error", err, "scene_id", sceneID, "cast_id", castID)
+			http.Error(w, "シーン必要キャスト作成に失敗しました。", http.StatusInternalServerError)
+			return
+		}
 
-// [GET] /api/scene_required_casts/{id} : シーン必要役者1件取得
-func HandleGetSceneRequiredCast(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-
+		// ID付きで確実に返すため、SELECTで再取得する
 		var s models.SceneRequiredCast
-		err := db.QueryRowContext(r.Context(), "SELECT id, scene_id, cast_id FROM scene_required_casts WHERE id = ?", id).
+		err = db.QueryRowContext(r.Context(), `
+SELECT src.id, src.scene_id, src.cast_id
+FROM scene_required_casts src
+JOIN scenes sc ON sc.id = src.scene_id
+JOIN casts c ON c.id = src.cast_id AND c.project_id = sc.project_id
+WHERE src.scene_id = ? AND src.cast_id = ? AND sc.project_id = ?`, sceneID, castID, projectID).
 			Scan(&s.ID, &s.SceneID, &s.CastID)
-
 		if err == sql.ErrNoRows {
-			http.Error(w, "Scene required cast not found", http.StatusNotFound)
+			http.Error(w, "シーンまたはキャストが見つかりません。", http.StatusNotFound)
 			return
 		} else if err != nil {
-			slog.Error("Failed to get scene_required_cast", "error", err, "id", id)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			slog.Error("シーン必要キャスト取得に失敗しました。", "error", err, "scene_id", sceneID, "cast_id", castID)
+			http.Error(w, "サーバー内部でエラーが発生しました。", http.StatusInternalServerError)
 			return
 		}
 
+		slog.Info("シーン必要キャストが作成されました。", "id", s.ID, "scene_id", s.SceneID, "cast_id", s.CastID)
 		response.RespondJSON(w, http.StatusOK, s)
 	}
 }
 
-// [DELETE] /api/scene_required_casts/{id} : シーン必要役者の削除
+// [DELETE] /api/projects/{projectId}/scenes/{sceneId}/required-casts/{castId} : シーン必要役者の削除
 func HandleDeleteSceneRequiredCast(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("id")
-
-		_, err := db.ExecContext(r.Context(), "DELETE FROM scene_required_casts WHERE id = ?", id)
+		projectID := r.PathValue("projectId")
+		sceneID, err := parsePathID(r.PathValue("sceneId"))
 		if err != nil {
-			slog.Error("Failed to delete scene_required_cast", "error", err, "id", id)
-			http.Error(w, "Failed to delete scene_required_cast", http.StatusInternalServerError)
+			http.Error(w, "シーンIDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
+		castID, err := parsePathID(r.PathValue("castId"))
+		if err != nil {
+			http.Error(w, "キャストIDの形式が不正です。", http.StatusBadRequest)
 			return
 		}
 
-		// 監査ログ
-		slog.Info("Scene required cast deleted", "id", id)
+		query := `
+DELETE src FROM scene_required_casts src
+JOIN scenes s ON s.id = src.scene_id
+JOIN casts c ON c.id = src.cast_id AND c.project_id = s.project_id
+WHERE src.scene_id = ? AND src.cast_id = ? AND s.project_id = ?`
+		result, err := db.ExecContext(r.Context(), query, sceneID, castID, projectID)
+		if err != nil {
+			slog.Error("シーン必要キャスト削除に失敗しました。", "error", err, "scene_id", sceneID, "cast_id", castID)
+			http.Error(w, "シーン必要キャスト削除に失敗しました。", http.StatusInternalServerError)
+			return
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			http.Error(w, "シーン必要キャスト削除に失敗しました。", http.StatusInternalServerError)
+			return
+		}
+		if rowsAffected == 0 {
+			http.Error(w, "シーン必要キャストが見つかりません。", http.StatusNotFound)
+			return
+		}
+
+		slog.Info("シーン必要キャストが削除されました。", "scene_id", sceneID, "cast_id", castID)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
 
-// [GET] /api/scenes/{id}/scene_required_casts : シーンに必要な役者一覧
+// [GET] /api/projects/{projectId}/scenes/{sceneId}/required-casts : シーンに必要な役者一覧
 func HandleListSceneRequiredCastsByScene(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		sceneID := r.PathValue("id")
-
-		rows, err := db.QueryContext(r.Context(), "SELECT id, scene_id, cast_id FROM scene_required_casts WHERE scene_id = ? ORDER BY id", sceneID)
+		projectID := r.PathValue("projectId")
+		sceneID, err := parsePathID(r.PathValue("sceneId"))
 		if err != nil {
-			slog.Error("Failed to fetch scene_required_casts", "error", err, "scene_id", sceneID)
-			http.Error(w, "Failed to fetch scene_required_casts", http.StatusInternalServerError)
+			http.Error(w, "シーンIDの形式が不正です。", http.StatusBadRequest)
+			return
+		}
+
+		query := `
+SELECT src.id, src.scene_id, src.cast_id
+FROM scene_required_casts src
+JOIN scenes s ON s.id = src.scene_id
+JOIN casts c ON c.id = src.cast_id AND c.project_id = s.project_id
+WHERE src.scene_id = ? AND s.project_id = ?
+ORDER BY src.id`
+		rows, err := db.QueryContext(r.Context(), query, sceneID, projectID)
+		if err != nil {
+			slog.Error("シーン必要キャスト一覧取得に失敗しました。", "error", err, "scene_id", sceneID)
+			http.Error(w, "シーン必要キャスト一覧取得に失敗しました。", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -90,13 +130,13 @@ func HandleListSceneRequiredCastsByScene(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var s models.SceneRequiredCast
 			if err := rows.Scan(&s.ID, &s.SceneID, &s.CastID); err != nil {
-				http.Error(w, "Failed to read scene_required_casts", http.StatusInternalServerError)
+				http.Error(w, "シーン必要キャスト一覧の読み取りに失敗しました。", http.StatusInternalServerError)
 				return
 			}
 			items = append(items, s)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "Failed to read scene_required_casts", http.StatusInternalServerError)
+			http.Error(w, "シーン必要キャスト一覧の読み取りに失敗しました。", http.StatusInternalServerError)
 			return
 		}
 

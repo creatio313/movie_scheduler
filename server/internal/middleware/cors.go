@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// CORSMiddleware は CORS対応のミドルウェアを提供します
+// クロスオリジンの許可
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// 環境変数からオリジンを取得（開発環境ではワイルドカード、本番環境では具体的なドメイン）

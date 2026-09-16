@@ -19,6 +19,40 @@
   }
 }
 
+@layer base {
+  body {
+    @apply h-full;
+  }
+  main{
+    @apply mx-auto w-full max-w-7xl;
+  }
+  label {
+    @apply block text-sm/6 font-medium text-gray-900 dark:text-white;
+  }
+  input,
+  textarea {
+    @apply block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-red-600 sm:text-sm/6 dark:bg-white/5 dark:text-white dark:outline-white/10 dark:placeholder:text-gray-500 dark:focus:outline-red-500;
+  }
+  table {
+    @apply relative min-w-full divide-y divide-gray-300 dark:divide-white/15;
+  }
+  table thead tr th:first-child {
+    @apply py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-gray-900 sm:pl-0 dark:text-white;
+  }
+  table thead tr th {
+    @apply px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white;
+  }
+  table tbody{
+    @apply divide-y divide-gray-200 dark:divide-white/10;
+  }
+  table tbody tr td:first-child {
+    @apply py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-gray-900 sm:pl-0 dark:text-white;
+  }
+  table tbody tr td {
+    @apply px-3 py-4 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
