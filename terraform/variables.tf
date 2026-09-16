@@ -78,7 +78,7 @@ variable "database_port" {
 variable "database_source_ranges" {
   type        = list(string)
   description = "データベースアクセスを許可する送信元CIDR範囲"
-  default     = ["192.168.1.0/24", "10.0.0.2/32"]
+  default     = ["192.168.1.64/26", "10.0.0.2/32"]
 }
 
 variable "database_username" {
