@@ -78,55 +78,48 @@ resource "sakura_apprun_dedicated_version" "mscheduler" {
   scaling_mode   = "cpu"
   env_vars = [
     {
-      key    = "ALLOWED_ORIGIN"
-      secret = false
-      value  = "https://${var.mscheduler_spa_domain}"
+      key   = "ALLOWED_ORIGIN"
+      value = "https://${var.mscheduler_spa_domain}"
     },
     {
-      key    = "SAKURA_VAULT_ID"
-      secret = false
-      value  = sakura_secret_manager.database_secret.id
+      key   = "SAKURA_VAULT_ID"
+      value = sakura_secret_manager.database_secret.id
     },
     {
-      key    = "SAKURA_SECRET_NAME"
-      secret = false
-      value  = "movie_schedule_db_password"
+      key   = "SAKURA_SECRET_NAME"
+      value = "movie_schedule_db_password"
     },
     {
-      key    = "SAKURA_SERVICE_PRINCIPAL_RESOURCE_ID"
-      secret = false
-      value  = var.sakura_service_principal_for_secret_unveil_resource_id
+      key   = "SAKURA_SERVICE_PRINCIPAL_RESOURCE_ID"
+      value = var.sakura_service_principal_for_secret_unveil_resource_id
     },
     {
-      key    = "SAKURA_SERVICE_PRINCIPAL_KEY_ID"
-      secret = false
-      value  = var.sakura_service_principal_key_for_secret_unveil_id
+      key   = "SAKURA_SERVICE_PRINCIPAL_KEY_ID"
+      value = var.sakura_service_principal_key_for_secret_unveil_id
     },
+    {
+      key   = "DB_HOST"
+      value = var.database_ip
+    },
+    {
+      key   = "DB_PORT"
+      value = var.database_port
+    },
+    {
+      key   = "DB_NAME"
+      value = var.database_username
+    },
+    {
+      key   = "DB_USER"
+      value = var.database_username
+    }
+  ]
+  secret_vars = [
     {
       key    = "SAKURA_SERVICE_PRINCIPAL_PRIVATE_KEY"
       secret = true
       value  = var.sakura_service_principal_private_key_for_secret_unveil
     },
-    {
-      key    = "DB_HOST"
-      secret = false
-      value  = var.database_ip
-    },
-    {
-      key    = "DB_PORT"
-      secret = false
-      value  = var.database_port
-    },
-    {
-      key    = "DB_NAME"
-      secret = false
-      value  = var.database_username
-    },
-    {
-      key    = "DB_USER"
-      secret = false
-      value  = var.database_username
-    }
   ]
   exposed_ports = [
     {
