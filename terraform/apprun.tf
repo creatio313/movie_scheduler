@@ -116,9 +116,9 @@ resource "sakura_apprun_dedicated_version" "mscheduler" {
   ]
   secret_vars = [
     {
-      key    = "SAKURA_SERVICE_PRINCIPAL_PRIVATE_KEY"
-      secret = true
-      value  = var.sakura_service_principal_private_key_for_secret_unveil
+      key              = "SAKURA_SERVICE_PRINCIPAL_PRIVATE_KEY"
+      value_wo         = var.sakura_service_principal_private_key_for_secret_unveil
+      value_wo_version = 1
     },
   ]
   exposed_ports = [

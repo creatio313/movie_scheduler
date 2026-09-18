@@ -102,7 +102,7 @@ variable "mscheduler_image" {
 variable "sakura_service_principal_for_secret_unveil_resource_id" {
   type        = string
   description = "シークレットマネージャ実行権限を持つサービスプリンシパルのリソースID"
-  default     = "113802145185"
+  default     = "123456789012"
 }
 
 /**
@@ -138,7 +138,7 @@ variable "server_icon" {
 variable "service_principal_id" {
   type        = string
   description = "サービスプリンシパルのID（AppRun）"
-  default     = "113802145182"
+  default     = "123456789012"
 }
 
 variable "vpn_icon" {
