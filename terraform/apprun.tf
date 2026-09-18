@@ -134,10 +134,11 @@ resource "sakura_apprun_dedicated_version" "mscheduler" {
       use_lets_encrypt = true
     },
   ]
-  max_scale           = 3
-  min_scale           = 1
-  registry_password   = var.container_password
-  registry_username   = var.container_username
-  scale_in_threshold  = 30
-  scale_out_threshold = 60
+  max_scale                = 3
+  min_scale                = 1
+  registry_password        = var.container_password
+  registry_password_action = "keep"
+  registry_username        = var.container_username
+  scale_in_threshold       = 30
+  scale_out_threshold      = 60
 }
