@@ -3,7 +3,7 @@ data "sakura_object_storage_site" "ishikari" {
 }
 
 resource "sakura_object_storage_bucket" "mscheduler_spa_bucket" {
-  name    = "mscheduler-spa-bucket"
+  name    = "mscheduler-spa-bkt"
   site_id = data.sakura_object_storage_site.ishikari.id
 }
 
